@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lattice – Modular Notes Workspace</title>
+<meta name="description" content="A plugin-driven notes workspace: storage, themes, fonts, editors, layouts and features are all swappable at runtime.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+tailwind.config={theme:{extend:{colors:{surface:'var(--surface)',surface2:'var(--surface2)',ink:'var(--ink)',muted:'var(--muted)',accent:'var(--accent)',accentHover:'var(--accent-hover)',accentInk:'var(--accent-ink)',line:'var(--line)'},fontFamily:{ui:['var(--font-ui)'],heading:['var(--font-heading)'],body:['var(--font-body)'],mono:['var(--font-mono)']},borderRadius:{theme:'var(--radius)'}}}};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+<style>
+:root{--surface:#FAFAF9;--surface2:#F3F3F1;--ink:#1C1C1A;--muted:#66665F;--accent:#4457D6;--accent-hover:#3345B8;--accent-ink:#fff;--line:rgba(28,28,26,.12);--radius:.625rem;--shadow:0 1px 2px rgba(0,0,0,.06);--fs:16px;--font-ui:system-ui,sans-serif;--font-heading:system-ui,sans-serif;--font-body:system-ui,sans-serif;--font-mono:ui-monospace,monospace;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;height:100%;background:var(--surface);color:var(--ink);font:var(--fs)/1.5 var(--font-ui);transition:background .2s,color .2s}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::selection{background:var(--accent);color:var(--accent-ink)}
+.app{display:grid;height:100%;grid-template-columns:var(--sbw,240px) 340px minmax(0,1fr)}
+#sidebar{background:var(--surface2);border-right:1px solid var(--line);overflow-y:auto}
+#note-list{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+#list-body{overflow-y:auto;flex:1}
+#note-detail{display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
+.drawer{transition:transform .25s ease}
+.md{font-family:var(--font-body);line-height:1.75;overflow-wrap:anywhere}.md h1,.md h2,.md h3{font-family:var(--font-heading);font-weight:600;margin:1em 0 .4em;line-height:1.25}.md h1{font-size:1.6em}.md h2{font-size:1.3em}.md h3{font-size:1.1em}.md p{margin:.6em 0}.md ul{list-style:disc;padding-left:1.4em;margin:.6em 0}.md code{font-family:var(--font-mono);font-size:.88em;background:var(--surface2);padding:.1em .35em;border-radius:6px}.md blockquote{border-left:3px solid var(--line);padding-left:1em;color:var(--muted)}.md a{color:var(--accent);text-decoration:underline}
+.tk-keyword{color:var(--syn-keyword,var(--accent))}.tk-string{color:var(--syn-string,var(--ink))}.tk-comment{color:var(--syn-comment,var(--muted));font-style:italic}.tk-number{color:var(--syn-number,var(--accent-hover))}.tk-fn{color:var(--syn-fn,var(--accent))}.tk-tag{color:var(--syn-tag,var(--accent))}.tk-attr{color:var(--syn-attr,var(--syn-fn,var(--muted)))}
+.md pre.code{background:var(--surface2);border:1px solid var(--line);border-radius:var(--radius);padding:.9em 1em;overflow-x:auto;margin:.8em 0;font:.86em/1.6 var(--font-mono);white-space:pre;color:var(--ink)}.md pre.code code{background:none;padding:0;font:inherit}
+.ed{position:relative;padding-bottom:5rem}
+.ed-t{display:block;width:100%;margin:0;padding:0;border:0;font:.9rem/1.75 var(--font-mono);letter-spacing:0;tab-size:4;white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal}
+.ed pre.ed-t{min-height:40vh;color:var(--ink);pointer-events:none}
+.ed textarea.ed-t{position:absolute;inset:0;height:100%;resize:none;overflow:hidden;background:transparent;color:transparent;caret-color:var(--ink);outline:none}
+.ed textarea.ed-t::selection{background:rgba(120,140,255,.35);color:transparent}
+.ed textarea.ed-t::placeholder{color:var(--muted)}
+.fab{position:absolute;right:1.25rem;bottom:1.25rem;z-index:5;display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.1rem;border:0;border-radius:999px;background:var(--accent);color:var(--accent-ink);font:500 .875rem var(--font-ui);box-shadow:0 6px 18px rgba(0,0,0,.25);cursor:pointer;transition:transform .15s,background .2s}.fab:hover{background:var(--accent-hover);transform:translateY(-1px)}
+@media(max-width:1023px){.app{grid-template-columns:var(--sbw,240px) minmax(0,1fr)}#note-detail{display:none}.has-note #note-detail{display:flex}.has-note #note-list{display:none}}
+@media(max-width:767px){.app{grid-template-columns:minmax(0,1fr)}#sidebar{position:fixed;inset:0 auto 0 0;width:min(280px,85vw);z-index:40;transform:translateX(-100%);transition:transform .2s;padding-top:env(safe-area-inset-top,0px)}.nav-open #sidebar{transform:none;box-shadow:0 8px 30px rgba(0,0,0,.25)}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body class="font-ui antialiased">
+<div id="app" class="app">
+  <nav id="sidebar" data-section="sidebar" aria-label="Workspace"></nav>
+  <section id="note-list" data-section="note-list" aria-label="Notes"><div id="list-head" class="p-4 border-b border-line"></div><div id="list-body"></div></section>
+  <main id="note-detail" data-section="note-detail"></main>
+</div>
+<aside id="plugin-manager" data-section="plugin-manager" class="drawer fixed top-0 right-0 z-40 h-full w-full max-w-md bg-surface border-l border-line overflow-y-auto translate-x-full" style="padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)" aria-label="Plugins and settings" aria-hidden="true"></aside>
+<div id="dialog-root" data-section="dialogs"></div>
+<div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-6 z-50 px-4 py-2 rounded-theme bg-ink text-surface text-sm opacity-0 pointer-events-none transition-opacity" role="status" aria-live="polite"></div>
+
+<script type="text/plain" id="ex-json">
+{
+  "id": "theme.ocean",
+  "name": "Ocean",
+  "version": "1.0.0",
+  "type": "theme",
+  "scheme": "dark",
+  "description": "Deep blue with a teal accent.",
+  "vars": {
+    "surface": "#0A1424", "surface2": "#101D33", "ink": "#E4ECF7", "muted": "#8FA3BF",
+    "accent": "#38BDF8", "accent-hover": "#7DD3FC", "accent-ink": "#06202E",
+    "line": "rgba(228,236,247,0.12)",
+    "syn-keyword": "#7DD3FC", "syn-string": "#86EFAC", "syn-comment": "#7A8CA8", "syn-number": "#FCD34D", "syn-fn": "#93C5FD", "syn-tag": "#F9A8D4"
+  }
+}
+</script>
+<script type="text/plain" id="ex-hl">
+{
+  "id": "hl.toml",
+  "name": "TOML highlighter",
+  "version": "1.0.0",
+  "type": "highlighter",
+  "grammars": {
+    "toml": [
+      [
+        "comment",
+        "#[^\\n]*"
+      ],
+      [
+        "string",
+        "\"(?:\\\\.|[^\"\\\\\\n])*\"|'[^'\\n]*'"
+      ],
+      [
+        "tag",
+        "^\\[[^\\]\\n]+\\]"
+      ],
+      [
+        "keyword",
+        "\\b(?:true|false)\\b"
+      ],
+      [
+        "number",
+        "\\b\\d[\\d_.:-]*\\b"
+      ],
+      [
+        "attr",
+        "^[\\w.-]+(?=\\s*=)"
+      ]
+    ]
+  }
+}
+</script>
+<script type="text/plain" id="ex-js">
+// A JavaScript plugin returns a plugin object (or an array of them).
+return {
+  id: 'notelist.titles',
+  name: 'Titles only',
+  version: '1.0.0',
+  type: 'notelist',
+  description: 'A minimal list that shows just titles.',
+  render(K, notes) {
+    if (!notes.length) return K.empty;
+    return '<ul class="divide-y divide-[var(--line)]">' + notes.map(n =>
+      `<li><div role="button" tabindex="0" data-cmd="note.open" data-arg="${n.id}" class="px-4 py-2 text-sm cursor-pointer hover:bg-surface2">${K.esc(n.title || 'Untitled')}</div></li>`
+    ).join('') + '</ul>';
+  }
+};
+</script>
+<script>
+(()=>{'use strict';
+const $=(s,r=document)=>r.querySelector(s),root=document.documentElement;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6),now=()=>Date.now();
+const lsGet=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch(e){return d}},lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const fmt=t=>new Date(t).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+const TODO='https://claude.ai/artifact/Ca5GsbH9CWt3k8m3qsJB3N';
+const ICON={plus:'<path d="M12 5v14M5 12h14"/>',star:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',archive:'<path d="M3 5h18v4H3zM5 9v10h14V9M10 13h4"/>',trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',back:'<path d="M15 5l-7 7 7 7"/>',settings:'<path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M8 15v4"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"/>',moon:'<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',notes:'<path d="M6 3h9l4 4v14H6zM9 12h7M9 16h7"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/>',folder:'<path d="M3 6h6l2 2h10v11H3z"/>',check:'<path d="M5 12.5l4.5 4.5L19 7"/>',code:'<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M14 5l-4 14"/>'};
+const ic=(n,c='w-4 h-4')=>`<svg class="${c}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]||''}</svg>`;
+const B='px-3 py-1.5 rounded-theme border border-line hover:bg-surface2 text-sm inline-flex items-center gap-1.5',P='px-3 py-1.5 rounded-theme bg-accent text-accentInk hover:bg-accentHover text-sm font-medium inline-flex items-center gap-1.5';
+let tt;const toast=m=>{const t=$('#toast');t.textContent=m;t.style.opacity=1;clearTimeout(tt);tt=setTimeout(()=>t.style.opacity=0,2400)};
+
+/* ===== Kernel: bus, commands, services, contributions ===== */
+const bus={m:{},on(e,f){(this.m[e]??=[]).push(f);return()=>{this.m[e]=this.m[e].filter(x=>x!==f)}},emit(e,d){(this.m[e]||[]).slice().forEach(f=>{try{f(d)}catch(x){console.error(e,x)}})}};
+const commands=new Map(),services=new Map(),slots={},view={filter:'all',noteId:null,q:''};
+const K={view,bus,esc,ic,fmt,toast,B,P,
+  run:(n,a)=>commands.has(n)?commands.get(n)(a):toast('That action is unavailable.'),
+  can:n=>commands.has(n),svc:n=>services.get(n)||null,cfg:id=>R.cfg(id),
+  collect:s=>(slots[s]||[]).flatMap(f=>f()).sort((a,b)=>(a.order??50)-(b.order??50)),
+  cat:n=>services.get('categories')?.get(n.categoryId)||null,
+  excerpt:(n,l=140)=>n.body.replace(/[#>*`_\[\]()]/g,'').replace(/\s+/g,' ').trim().slice(0,l),
+  empty:'<p class="p-6 text-sm text-muted">No notes here yet.</p>',
+  tools:()=>[{cmd:'theme.toggle',icon:R.get('theme')?.scheme==='dark'?'sun':'moon',label:'Light / dark'},{cmd:'settings.toggle',icon:'settings',label:'Plugins & settings'},{href:TODO,icon:'check',label:'Todo app'}],
+  tool:(t,compact)=>{const tag=t.href?'a':'button',a=t.href?`href="${t.href}" target="_blank" rel="noopener"`:`data-cmd="${t.cmd}"`;return `<${tag} ${a} title="${t.label}" aria-label="${t.label}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-theme text-sm text-muted hover:bg-surface2 hover:text-ink">${ic(t.icon)}${compact?'':`<span>${t.label}</span>`}</${tag}>`}};
+
+/* ===== Plugin registry: contracts, lifecycle, dependencies, runtime swap ===== */
+const CONTRACTS={storage:{ex:1,label:'Storage',req:['read','write']},theme:{ex:1,label:'Themes',req:['vars']},typography:{ex:1,label:'Typography',req:['stacks']},editor:{ex:1,label:'Editors',req:['mount']},sidebar:{ex:1,label:'Sidebars',req:['render']},notelist:{ex:1,label:'Note lists',req:['render']},dialogs:{ex:1,label:'Dialogs',req:['confirm','form']},highlighter:{ex:0,label:'Syntax highlighters',req:['grammars']},feature:{ex:0,label:'Features',req:[]}};
+const R={plugins:new Map(),st:lsGet('ws.plugins.v2',{active:{},enabled:{},config:{}}),
+  register(p){const c=CONTRACTS[p.type];if(!c)throw Error('Unknown plugin type: '+p.type);const miss=c.req.filter(k=>!(k in p));if(miss.length)throw Error(p.id+' is missing: '+miss.join(', '));p.deps=p.deps||[];p.status='inactive';this.plugins.set(p.id,p);return p},
+  isOn(id){return this.plugins.get(id)?.status==='active'},
+  get(type){for(const p of this.plugins.values())if(p.type===type&&p.status==='active')return p;return null},
+  depOk(d){return d.startsWith('type:')?!!this.get(d.slice(5)):this.isOn(d)},
+  cfg(id){const p=this.plugins.get(id);return{...(p?.config||{}),...(this.st.config[id]||{})}},
+  save(){lsSet('ws.plugins.v2',this.st)},
+  ctx(p){return{...K,reg:R,get:t=>R.get(t),cfg:()=>R.cfg(p.id),
+    on:(e,f)=>p._offs.push(bus.on(e,f)),cmd:(n,f)=>{commands.set(n,f);p._cmds.push(n)},
+    provide:(n,o)=>{services.set(n,o);p._svc.push(n)},
+    contribute:(s,f)=>{(slots[s]??=[]).push(f);p._offs.push(()=>{slots[s]=slots[s].filter(x=>x!==f)})}}},
+  start(p){if(!p.deps.every(d=>this.depOk(d))){p.status='blocked';return false}
+    p._cmds=[];p._offs=[];p._svc=[];
+    try{p.init?.(this.ctx(p));p.status='active';p._err=null;return true}
+    catch(e){this.stop(p);p.status='failed';p._err=e.message;console.error(p.id,e);return false}},
+  stop(p){try{p.dispose?.()}catch(e){console.error(e)}p._cmds?.forEach(n=>commands.delete(n));p._offs?.forEach(f=>f());p._svc?.forEach(n=>services.delete(n));p.status='inactive'},
+  async activate(id){const p=this.plugins.get(id);if(this.get(p.type)===p)return;if(p.preload){try{await p.preload()}catch(e){return toast(p.name+' could not open: '+e.message)}}const old=this.get(p.type);if(old)this.stop(old);
+    if(this.start(p))this.st.active[p.type]=id;else{toast(p.name+' could not start'+(p._err?': '+p._err:'. Missing dependency.'));if(old)this.start(old)}
+    this.save();bus.emit('plugins',{type:p.type});if(p.type==='storage')bus.emit('storage:changed')},
+  enable(id){const p=this.plugins.get(id);this.st.enabled[id]=true;if(!this.start(p)){toast(p.name+' needs: '+p.deps.filter(d=>!this.depOk(d)).join(', '));this.st.enabled[id]=false}this.save();bus.emit('plugins',{id})},
+  disable(id){const p=this.plugins.get(id),dep=[...this.plugins.values()].filter(q=>q.status==='active'&&q.deps.includes(id));
+    if(dep.length)return toast('Disable first: '+dep.map(d=>d.name).join(', '));
+    this.stop(p);this.st.enabled[id]=false;this.save();bus.emit('plugins',{id})},
+  setConfig(id,k,v){this.st.config[id]={...(this.st.config[id]||{}),[k]:v};this.save();this.plugins.get(id).onConfig?.(this.cfg(id));bus.emit('plugins',{id})},
+  boot(){const W=p=>CONTRACTS[p.type].ex?this.st.active[p.type]===p.id:this.st.enabled[p.id]!==false,all=()=>[...this.plugins.values()];
+    for(const t in CONTRACTS)if(CONTRACTS[t].ex&&!this.plugins.get(this.st.active[t]))this.st.active[t]=all().find(p=>p.type===t)?.id;
+    const pass=()=>{let go=1;while(go){go=0;for(const p of all())if(!['active','failed'].includes(p.status)&&W(p)&&p.deps.every(d=>this.depOk(d))){this.start(p);go=1}}};
+    pass();
+    for(const t in CONTRACTS)if(CONTRACTS[t].ex&&!this.get(t))for(const p of all())if(p.type===t&&p.status!=='failed'&&this.start(p)){this.st.active[t]=p.id;break}
+    pass();all().forEach(p=>{if(W(p)&&p.status==='inactive')p.status='blocked'});this.save()}};
+const cmd0=(n,f)=>commands.set(n,f);
+
+/* ===== Plugins: storage ===== */
+R.register({id:'storage.local',name:'Browser localStorage',version:'1.0.0',type:'storage',description:'Keeps notes in this browser between sessions.',read:ns=>lsGet('ws.data.'+ns,null),write:(ns,d)=>lsSet('ws.data.'+ns,d)});
+const mem=new Map();
+R.register({id:'storage.memory',name:'In-memory (temporary)',version:'1.0.0',type:'storage',description:'Holds notes until you close the tab. Switching copies your workspace across.',read:ns=>mem.has(ns)?JSON.parse(mem.get(ns)):null,write:(ns,d)=>mem.set(ns,JSON.stringify(d))});
+
+/* ===== Plugins: themes ===== */
+const T=(id,name,scheme,v)=>R.register({id:'theme.'+id,name,version:'1.0.0',type:'theme',scheme,description:'A '+scheme+' palette.',vars:{radius:'.625rem',shadow:'0 1px 2px rgba(0,0,0,.06)',...v},
+  init(){for(const k in this.vars)root.style.setProperty('--'+k,this.vars[k]);root.style.colorScheme=scheme},
+  dispose(){for(const k in this.vars)root.style.removeProperty('--'+k)}});
+T('paper','Paper','light',{surface:'#FAFAF9',surface2:'#F3F3F1',ink:'#1C1C1A',muted:'#66665F',accent:'#4457D6','accent-hover':'#3345B8','accent-ink':'#FFFFFF',line:'rgba(28,28,26,.12)','syn-keyword':'#7B3FA8','syn-string':'#1F7A4D','syn-comment':'#6B6B63','syn-number':'#B45309','syn-fn':'#2F55C7','syn-tag':'#B0356B'});
+T('sepia','Sepia','light',{surface:'#F6F0E4',surface2:'#EDE4D2',ink:'#2E2619',muted:'#6E604A',accent:'#8A5A1F','accent-hover':'#6F4716','accent-ink':'#FFFFFF',line:'rgba(46,38,25,.16)','syn-keyword':'#8F3A2B','syn-string':'#41682F','syn-comment':'#6B5C44','syn-number':'#8A5200','syn-fn':'#2C5A7A','syn-tag':'#9C3F66'});
+T('graphite','Graphite','dark',{surface:'#151517',surface2:'#1E1E21',ink:'#ECECEA',muted:'#9A9AA0',accent:'#8FA0FF','accent-hover':'#AAB7FF','accent-ink':'#11131F',line:'rgba(255,255,255,.1)','syn-keyword':'#C4A5FF','syn-string':'#8FD9A8','syn-comment':'#8E8E96','syn-number':'#F2B77A','syn-fn':'#8FB4FF','syn-tag':'#FF9DBB',shadow:'0 1px 2px rgba(0,0,0,.4)'});
+
+/* ===== Plugins: typography ===== */
+const F=(id,name,url,ui,heading,body,mono)=>R.register({id:'type.'+id,name,version:'1.0.0',type:'typography',description:'Heading '+heading.split(',')[0].replace(/'/g,'')+', body '+body.split(',')[0].replace(/'/g,'')+'.',stacks:{ui,heading,body,mono},config:{size:16},schema:[{key:'size',label:'Base size (px)',type:'range',min:14,max:20,step:1}],
+  apply(c){const s=this.stacks;root.style.setProperty('--font-ui',s.ui);root.style.setProperty('--font-heading',s.heading);root.style.setProperty('--font-body',s.body);root.style.setProperty('--font-mono',s.mono);root.style.setProperty('--fs',c.size+'px');
+    let l=$('#font-link');if(!l){l=document.createElement('link');l.id='font-link';l.rel='stylesheet';document.head.appendChild(l)}if(l.href!==url)l.href=url},
+  init(c){this.apply(c.cfg())},onConfig(c){this.apply(c)},
+  dispose(){['ui','heading','body','mono'].forEach(k=>root.style.removeProperty('--font-'+k));root.style.removeProperty('--fs')}});
+F('inter','Inter Sans','https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono&display=swap',"'Inter',system-ui,sans-serif","'Inter',system-ui,sans-serif","'Inter',system-ui,sans-serif","'JetBrains Mono',monospace");
+F('serif','Editorial Serif','https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Inter:wght@400;500&family=Source+Serif+4&family=IBM+Plex+Mono&display=swap',"'Inter',system-ui,sans-serif","'Fraunces',Georgia,serif","'Source Serif 4',Georgia,serif","'IBM Plex Mono',monospace");
+F('mono','Mono Writer','https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&display=swap',"'IBM Plex Sans',system-ui,sans-serif","'IBM Plex Mono',monospace","'IBM Plex Mono',monospace","'IBM Plex Mono',monospace");
+
+/* ===== Plugins: editors ===== */
+/* ===== Tokenizer engine + syntax highlighters (token colors come from the active theme) ===== */
+const compile=rules=>{try{let off=1;const idx=[],src=rules.map(([c,r])=>{const x=r.source||r,n=new RegExp(x+'|').exec('').length-1;idx.push([c,off]);off+=n+1;return'('+x+')'}).join('|');return{re:new RegExp(src,'gm'),idx}}catch(e){return null}};
+const run=(code,g)=>{let out='',last=0,m;g.re.lastIndex=0;while((m=g.re.exec(code))){if(!m[0]){g.re.lastIndex++;continue}const r=g.idx.find(x=>m[x[1]]!==undefined);out+=esc(code.slice(last,m.index))+(r?`<span class="tk-${r[0]}">${esc(m[0])}</span>`:esc(m[0]));last=m.index+m[0].length}return out+esc(code.slice(last))};
+const GC=new WeakMap();
+const hl=(code,lang)=>{lang=(lang||'').toLowerCase();if(lang&&code.length<15000)for(const p of R.plugins.values()){const rules=p.type==='highlighter'&&p.status==='active'&&p.grammars[lang];if(!rules)continue;let g=GC.get(rules);if(g===undefined){g=compile(rules);GC.set(rules,g)}if(g)return run(code,g)}return esc(code)};
+const kw=w=>new RegExp('\\b(?:'+w+')\\b');
+const S2=/"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'/;
+const RJS=[['comment',/\/\/[^\n]*|\/\*[\s\S]*?\*\//],['string',/"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`/],['number',/\b(?:0x[\da-f]+|\d[\d_]*\.?\d*(?:e[+-]?\d+)?)\b/i],['keyword',kw('const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|new|class|extends|import|export|from|default|async|await|try|catch|finally|throw|typeof|instanceof|in|of|this|null|undefined|true|false|interface|type|enum|public|private|static')],['fn',/\b[A-Za-z_$][\w$]*(?=\()/]];
+const RPY=[['comment',/#[^\n]*/],['string',/[rbfRBF]{0,2}(?:"{3}[\s\S]*?"{3}|'{3}[\s\S]*?'{3}|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*')/],['number',/\b\d[\d_]*\.?\d*\b/],['keyword',kw('def|class|return|if|elif|else|for|while|in|not|and|or|is|import|from|as|with|try|except|finally|raise|pass|break|continue|lambda|yield|None|True|False|async|await|global|nonlocal|self')],['fn',/\b[A-Za-z_]\w*(?=\()/]];
+const RHTML=[['comment',/<!--[\s\S]*?-->/],['string',/"[^"\n]*"|'[^'\n]*'/],['tag',/<\/?[A-Za-z][\w:-]*|\/?>/],['attr',/[\w:-]+(?==)/]];
+const RCSS=[['comment',/\/\*[\s\S]*?\*\//],['string',S2],['keyword',/@[\w-]+/],['attr',/[\w-]+(?=\s*:)/],['number',/-?\d[\d.]*(?:px|rem|em|%|vh|vw|s|deg)?\b/],['tag',/[.#][\w-]+/]];
+const RSH=[['comment',/#[^\n]*/],['string',S2],['keyword',kw('if|then|else|fi|for|do|done|while|case|esac|function|in|export|local|return')],['number',/\b\d+\b/],['fn',/\$[\w{}]+/]];
+const LG=(l,r)=>Object.fromEntries(l.map(k=>[k,r]));
+const HL=(id,name,description,grammars)=>R.register({id:'hl.'+id,name,version:'1.0.0',type:'highlighter',description,grammars});
+HL('javascript','JavaScript, TypeScript & JSON','Fenced blocks tagged js, jsx, ts, tsx or json.',LG(['js','jsx','javascript','ts','tsx','typescript','json'],RJS));
+HL('python','Python','Fenced blocks tagged py or python.',LG(['py','python'],RPY));
+HL('web','HTML, XML & CSS','Fenced blocks tagged html, xml, svg or css.',{...LG(['html','xml','svg'],RHTML),css:RCSS});
+HL('shell','Shell','Fenced blocks tagged sh, bash or zsh.',LG(['sh','bash','shell','zsh'],RSH));
+
+/* Markdown: source highlighting (editor) and HTML rendering (preview) */
+const MDG=compile([['keyword',/^#{1,6} .*/],['comment',/^>.*/],['number',/^\s*(?:[-*+]|\d+\.)(?= )/],['string',/`[^`\n]+`/],['fn',/\*\*[^*\n]+\*\*|__[^_\n]+__|\*[^*\s][^*\n]*\*/],['tag',/\[[^\]\n]*\]\([^)\n]*\)/]]);
+const hlMd=s=>{const ln=s.split('\n'),out=[];let i=0;
+  while(i<ln.length){const f=ln[i].match(/^\s*```(\w*)/);
+    if(f){let j=i+1;while(j<ln.length&&!/^\s*```/.test(ln[j]))j++;
+      out.push(`<span class="tk-comment">${esc(ln[i])}</span>`);
+      if(j>i+1)out.push(hl(ln.slice(i+1,j).join('\n'),f[1]));
+      if(j<ln.length)out.push(`<span class="tk-comment">${esc(ln[j])}</span>`);i=j+1}
+    else{out.push(run(ln[i],MDG));i++}}
+  return out.join('\n')+'\n'};
+const md=s=>{const code=[];s=s.replace(/```(\w*)[^\S\n]*\n([\s\S]*?)(?:```|$)/g,(m,l,c)=>{code.push(`<pre class="code" data-lang="${esc(l)}"><code>${hl(c.replace(/\n$/,''),l)}</code></pre>`);return`\n\n\uE000${code.length-1}\uE001\n\n`});
+  s=esc(s);const il=t=>t.replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/\*([^*]+)\*/g,'<i>$1</i>').replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return s.split(/\n{2,}/).filter(b=>b.trim()).map(b=>{let m=b.trim().match(/^\uE000(\d+)\uE001$/);if(m)return code[m[1]];m=b.match(/^(#{1,3}) (.*)/);if(m)return`<h${m[1].length}>${il(m[2])}</h${m[1].length}>`;if(/^(- |\* )/.test(b))return'<ul>'+b.split('\n').map(l=>'<li>'+il(l.replace(/^(- |\* )/,''))+'</li>').join('')+'</ul>';if(b.startsWith('&gt; '))return'<blockquote>'+il(b.replace(/^&gt; /gm,''))+'</blockquote>';return'<p>'+il(b).replace(/\n/g,'<br>')+'</p>'}).join('')};
+K.hl=hl;K.md=md;
+
+/* ===== Plugins: editors ===== */
+const area=(host,value,onInput,font)=>{const t=document.createElement('textarea');t.className='w-full h-full min-h-[40vh] resize-none bg-transparent outline-none leading-7';t.style.fontFamily=font;t.value=value;t.placeholder='Start writing…';t.setAttribute('aria-label','Note content');t.oninput=()=>onInput(t.value);host.append(t);return t};
+R.register({id:'editor.plain',name:'Plain text',version:'1.0.0',type:'editor',description:'A distraction-free text area.',
+  mount(host,{value,onInput}){const t=area(host,value,onInput,'var(--font-body)');return{get:()=>t.value,focus:()=>t.focus(),destroy:()=>t.remove()}}});
+R.register({id:'editor.markdown',name:'Markdown',version:'2.0.0',type:'editor',description:'Highlighted Markdown source with a floating button that switches to the rendered HTML view.',config:{startHtml:false},schema:[{key:'startHtml',label:'Open notes in HTML view',type:'toggle'}],
+  mount(host,{value,onInput,cfg}){let val=value,html=!!cfg.startHtml;
+    const w=document.createElement('div');w.className='ed';
+    const pre=document.createElement('pre');pre.className='ed-t';pre.setAttribute('aria-hidden','true');
+    const t=document.createElement('textarea');t.className='ed-t';t.value=val;t.placeholder='Start writing Markdown…';t.setAttribute('aria-label','Note content (Markdown)');
+    const pv=document.createElement('div');pv.className='md';pv.style.paddingBottom='5rem';
+    const fab=document.createElement('button');fab.type='button';fab.className='fab';
+    const paint=()=>{pre.innerHTML=val.length>60000?esc(val)+'\n':hlMd(val)};
+    const show=()=>{w.hidden=html;pv.hidden=!html;if(html)pv.innerHTML=md(val);const l=html?'Markdown':'HTML',a=html?'Switch to editing Markdown':'Switch to the HTML view';fab.innerHTML=ic(html?'edit':'code','w-4 h-4')+'<span>'+l+'</span>';fab.title=a;fab.setAttribute('aria-label',a)};
+    t.oninput=()=>{val=t.value;paint();onInput(val)};
+    fab.onclick=()=>{html=!html;show();if(!html)t.focus()};
+    w.append(pre,t);host.append(w,pv);host.parentElement.append(fab);paint();show();
+    return{get:()=>val,focus:()=>{if(!html)t.focus()},destroy:()=>{w.remove();pv.remove();fab.remove()}}}});
+
+/* ===== Plugins: dialogs ===== */
+R.register({id:'dialogs.default',name:'Modal dialogs',version:'1.0.0',type:'dialogs',description:'Confirmation and form dialogs.',
+  dispose(){$('#dialog-root').innerHTML=''},
+  confirm({title,message,confirmLabel='Confirm',danger}){return this._m(`<h2 class="font-heading text-lg font-semibold">${esc(title)}</h2><p class="text-sm text-muted">${esc(message)}</p><div class="flex justify-end gap-2"><button data-x class="${B}">Cancel</button><button data-ok class="${P}" ${danger?'style="background:#B42318;color:#fff"':''}>${esc(confirmLabel)}</button></div>`).then(v=>v===true)},
+  form({title,fields,values={},submit='Save'}){const f=fields.map(x=>`<label class="block text-sm"><span class="text-muted">${x.label}</span>${x.type==='textarea'?`<textarea name="${x.key}" rows="3" class="mt-1 w-full px-3 py-2 rounded-theme bg-surface2 border border-line">${esc(values[x.key])}</textarea>`:`<input name="${x.key}" type="${x.type==='color'?'color':'text'}" value="${esc(values[x.key]??x.def??'')}" ${x.max?`maxlength="${x.max}"`:''} class="mt-1 ${x.type==='color'?'h-9 w-16 p-1':'w-full px-3 py-2'} rounded-theme bg-surface2 border border-line"></label>`}`.replace(/<\/label>$/,'')+'</label>').join('');
+    return this._m(`<h2 class="font-heading text-lg font-semibold">${esc(title)}</h2><form class="space-y-3">${f}<div class="flex justify-end gap-2 pt-2"><button type="button" data-x class="${B}">Cancel</button><button type="submit" class="${P}">${esc(submit)}</button></div></form>`)},
+  _m(html){return new Promise(res=>{const r=$('#dialog-root');r.innerHTML=`<div data-ov class="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"><div role="dialog" aria-modal="true" class="w-full max-w-md bg-surface text-ink border border-line rounded-theme shadow-xl p-5 space-y-4">${html}</div></div>`;
+    const kd=e=>{if(e.key==='Escape')done(null)},done=v=>{document.removeEventListener('keydown',kd);r.innerHTML='';res(v)};document.addEventListener('keydown',kd);
+    r.firstChild.addEventListener('click',e=>{const d=e.target.dataset;if('ov' in d||'x' in d)done(null);else if('ok' in d)done(true)});
+    r.querySelector('form')?.addEventListener('submit',e=>{e.preventDefault();done(Object.fromEntries(new FormData(e.target)))});
+    (r.querySelector('input,textarea')||r.querySelector('[data-ok]')).focus()})}});
+
+/* ===== Plugins: sidebars ===== */
+const navRow=(K,i,compact)=>{const on=K.view.filter===i.filter,dot=i.color||i.group==='cats'?`<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${K.esc(i.color||'var(--muted)')}"></span>`:K.ic(i.icon||'folder');
+  return `<button data-cmd="view.filter" data-arg="${K.esc(i.filter)}" title="${K.esc(i.label)}" aria-current="${on}" class="w-full flex items-center ${compact?'justify-center':'gap-2'} px-2.5 py-1.5 rounded-theme text-sm text-left ${on?'bg-surface font-medium':'text-muted hover:bg-surface hover:text-ink'}">${dot}${compact?'':`<span class="truncate flex-1">${K.esc((i.emoji?i.emoji+' ':'')+i.label)}</span><span class="text-xs text-muted">${i.count??''}</span>`}</button>`};
+R.register({id:'sidebar.classic',name:'Classic sidebar',version:'1.0.0',type:'sidebar',description:'Full-width navigation with labelled categories.',config:{width:240},schema:[{key:'width',label:'Width (px)',type:'range',min:200,max:320,step:10}],
+  width:c=>c.width,
+  render(K){const nav=K.collect('nav'),m=nav.filter(i=>i.group!=='cats'),c=nav.filter(i=>i.group==='cats');
+    return `<div class="p-3 flex flex-col min-h-full gap-4"><div class="px-2.5 pt-1 font-heading text-xl font-semibold">Lattice</div>${K.can('note.create')?`<button data-cmd="note.create" class="${K.P} justify-center">${K.ic('plus')}New note</button>`:''}
+    <div class="space-y-0.5">${m.map(i=>navRow(K,i)).join('')}</div>
+    ${K.can('cat.create')||c.length?`<div class="space-y-0.5"><div class="flex items-center justify-between px-2.5 mb-1"><span class="text-xs uppercase tracking-wider text-muted">Categories</span>${K.can('cat.create')?`<button data-cmd="cat.create" class="p-1 rounded text-muted hover:text-ink" aria-label="New category">${K.ic('plus')}</button>`:''}</div>${c.map(i=>navRow(K,i)).join('')}</div>`:''}
+    <div class="mt-auto border-t border-line pt-2 space-y-0.5">${K.tools().map(t=>K.tool(t)).join('')}</div></div>`}});
+R.register({id:'sidebar.compact',name:'Icon rail',version:'1.0.0',type:'sidebar',description:'A slim rail of icons and category dots.',width:()=>64,
+  render(K){const nav=K.collect('nav');return `<div class="p-2 flex flex-col items-center min-h-full gap-3">${K.can('note.create')?`<button data-cmd="note.create" class="${K.P} px-2.5" aria-label="New note">${K.ic('plus')}</button>`:''}<div class="w-full space-y-0.5">${nav.map(i=>navRow(K,i,1)).join('')}</div>${K.can('cat.create')?`<button data-cmd="cat.create" class="p-2 rounded text-muted hover:text-ink" aria-label="New category">${K.ic('plus')}</button>`:''}<div class="mt-auto w-full">${K.tools().map(t=>K.tool(t,1)).join('')}</div></div>`}});
+
+/* ===== Plugins: note lists ===== */
+const sel=(K,n)=>K.view.noteId===n.id;
+const meta=(K,n)=>{const c=K.cat(n);return `<div class="flex items-center gap-2 text-xs text-muted">${c?`<span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full" style="background:${K.esc(c.color||'var(--muted)')}"></span>${K.esc(c.name)}</span>·`:''}<span>${K.fmt(n.updated)}</span>${n.favorite?`<span class="ml-auto text-accent">${K.ic('star','w-3.5 h-3.5')}</span>`:''}</div>`};
+R.register({id:'notelist.cards',name:'Cards',version:'1.0.0',type:'notelist',description:'Roomy cards with an excerpt.',
+  render(K,notes){return notes.length?`<ul class="p-3 space-y-2">${notes.map(n=>`<li><div role="button" tabindex="0" data-cmd="note.open" data-arg="${n.id}" aria-current="${sel(K,n)}" class="p-3 rounded-theme border bg-surface cursor-pointer space-y-1 ${sel(K,n)?'border-accent':'border-line hover:bg-surface2'}" style="box-shadow:var(--shadow)"><div class="font-heading font-semibold truncate">${K.esc(n.title||'Untitled')}</div><p class="text-sm text-muted line-clamp-2 min-h-[1.25rem]">${K.esc(K.excerpt(n))||'No content yet'}</p>${meta(K,n)}</div></li>`).join('')}</ul>`:K.empty}});
+R.register({id:'notelist.rows',name:'Compact rows',version:'1.0.0',type:'notelist',description:'Dense single-line rows.',config:{excerpt:false},schema:[{key:'excerpt',label:'Show excerpt',type:'toggle'}],
+  render(K,notes,cfg){return notes.length?`<ul class="divide-y divide-[var(--line)]">${notes.map(n=>`<li><div role="button" tabindex="0" data-cmd="note.open" data-arg="${n.id}" aria-current="${sel(K,n)}" class="px-4 py-2.5 cursor-pointer ${sel(K,n)?'bg-surface2':'hover:bg-surface2'}"><div class="text-sm font-medium truncate">${K.esc(n.title||'Untitled')}</div>${cfg.excerpt?`<p class="text-xs text-muted truncate">${K.esc(K.excerpt(n,90))}</p>`:''}${meta(K,n)}</div></li>`).join('')}</ul>`:K.empty}});
+
+/* ===== Plugins: features ===== */
+R.register({id:'feature.notes',name:'Notes',version:'1.0.0',type:'feature',description:'Create, edit, list and delete notes.',deps:['type:storage'],
+  init(c){let notes=c.get('storage').read('notes')||[];const persist=()=>{c.get('storage').write('notes',notes);c.bus.emit('data')};
+    c.on('storage:changed',()=>c.get('storage').write('notes',notes));
+    c.on('category:removed',id=>{notes.forEach(n=>{if(n.categoryId===id)n.categoryId=null});persist()});
+    const N={all:()=>notes,get:id=>notes.find(n=>n.id===id),
+      list({filter='all',q=''}={}){let r=notes.filter(n=>{if(filter==='archive')return n.archived;if(n.archived)return false;if(filter==='favorites')return n.favorite;if(filter.startsWith('cat:')){const i=filter.slice(4);return i==='none'?!n.categoryId:n.categoryId===i}return true});const s=c.svc('search');if(q&&s)r=s.match(r,q);return r.sort((a,b)=>b.updated-a.updated)},
+      count:f=>N.list({filter:f}).length,
+      create(d={}){const t=now(),n={id:uid(),title:'',body:'',categoryId:null,archived:false,favorite:false,created:t,updated:t,...d};notes.unshift(n);persist();return n},
+      update(id,p,touch=true){const n=N.get(id);if(!n)return null;Object.assign(n,p);if(touch)n.updated=now();persist();return n},
+      remove(id){notes=notes.filter(n=>n.id!==id);persist()}};
+    c.provide('notes',N);
+    c.contribute('nav',()=>[{group:'main',order:1,filter:'all',label:'All notes',icon:'notes',count:N.count('all')}]);
+    c.cmd('note.create',()=>{let f=c.view.filter;if(!f.startsWith('cat:'))f='all';c.view.filter=f;const n=N.create({categoryId:f.startsWith('cat:')&&f!=='cat:none'?f.slice(4):null});c.run('note.open',n.id);setTimeout(()=>$('#note-title')?.focus(),30)});
+    c.cmd('note.delete',async id=>{const n=N.get(id);if(!n)return;if(await c.get('dialogs').confirm({title:'Delete note permanently?',message:`“${n.title||'Untitled'}” will be removed for good. Archive it instead if you might need it later.`,confirmLabel:'Delete',danger:true})){N.remove(id);toast('Note deleted')}})}});
+R.register({id:'feature.categories',name:'Categories',version:'1.0.0',type:'feature',description:'Organise notes into named, coloured categories.',deps:['type:storage'],
+  init(c){let cats=c.get('storage').read('categories')||[];const persist=()=>{c.get('storage').write('categories',cats);c.bus.emit('data')};
+    c.on('storage:changed',()=>c.get('storage').write('categories',cats));
+    const S={all:()=>cats,get:id=>cats.find(x=>x.id===id),create(d){const x={id:uid(),name:d.name.trim(),description:d.description||'',icon:d.icon||'',color:d.color||'#4457D6',created:now()};cats.push(x);persist();return x},update(id,d){const x=S.get(id);if(x){Object.assign(x,d,{name:(d.name||x.name).trim()});persist()}},remove(id){cats=cats.filter(x=>x.id!==id);persist();c.bus.emit('category:removed',id)}};
+    c.provide('categories',S);
+    c.contribute('nav',()=>{const N=c.svc('notes'),u=N?N.count('cat:none'):0;return[...(u?[{group:'cats',order:40,filter:'cat:none',label:'Uncategorized',count:u}]:[]),...cats.map(x=>({group:'cats',order:50,filter:'cat:'+x.id,label:x.name,emoji:x.icon,color:x.color,count:N?N.count('cat:'+x.id):''}))]});
+    const F=[{key:'name',label:'Name',max:40},{key:'icon',label:'Icon (optional emoji)',max:2},{key:'color',label:'Color',type:'color'},{key:'description',label:'Description (optional)',type:'textarea'}];
+    c.cmd('cat.create',async()=>{const v=await c.get('dialogs').form({title:'New category',fields:F,values:{color:'#4457D6'},submit:'Create'});if(v&&v.name.trim()){const x=S.create(v);c.run('view.filter','cat:'+x.id)}});
+    c.cmd('cat.edit',async id=>{const x=S.get(id);if(!x)return;const v=await c.get('dialogs').form({title:'Edit category',fields:F,values:x});if(v&&v.name.trim())S.update(id,v)});
+    c.cmd('cat.delete',async id=>{const x=S.get(id);if(x&&await c.get('dialogs').confirm({title:'Delete category?',message:`“${x.name}” will be removed. Its notes are kept and moved to Uncategorized.`,confirmLabel:'Delete category',danger:true})){if(c.view.filter==='cat:'+id)c.view.filter='all';S.remove(id)}})}});
+R.register({id:'feature.archive',name:'Archive',version:'1.0.0',type:'feature',description:'Archive and restore notes without deleting them.',deps:['feature.notes'],
+  init(c){const N=c.svc('notes');c.contribute('nav',()=>[{group:'main',order:3,filter:'archive',label:'Archived',icon:'archive',count:N.count('archive')}]);
+    c.cmd('note.archive',id=>{const n=N.get(id);if(!n)return;c.bus.emit('flush');N.update(id,{archived:!n.archived},false);c.view.noteId=null;c.bus.emit('detail');toast(n.archived?'Note archived':'Note restored')})}});
+R.register({id:'feature.favorites',name:'Favorites',version:'1.0.0',type:'feature',description:'Star notes and see them in one place.',deps:['feature.notes'],
+  init(c){const N=c.svc('notes');c.contribute('nav',()=>[{group:'main',order:2,filter:'favorites',label:'Favorites',icon:'star',count:N.count('favorites')}]);
+    c.cmd('note.favorite',id=>{const n=N.get(id);if(n){N.update(id,{favorite:!n.favorite},false);c.bus.emit('detail')}})}});
+R.register({id:'feature.search',name:'Search',version:'1.0.0',type:'feature',description:'Filter notes by title and content.',deps:['feature.notes'],config:{body:true},schema:[{key:'body',label:'Search note content',type:'toggle'}],
+  init(c){c.provide('search',{match:(list,q)=>{q=q.toLowerCase();const b=c.cfg().body;return list.filter(n=>n.title.toLowerCase().includes(q)||(b&&n.body.toLowerCase().includes(q)))}})}});
+
+/* ===== Shell: core view commands & rendering ===== */
+const app=$('#app');let cur=null,inst=null,dirty=false,timer,N0=()=>K.svc('notes');
+const setStatus=s=>{const e=$('#save-status');if(e){e.textContent={saved:'Saved',saving:'Saving…',unsaved:'Unsaved changes'}[s];e.dataset.s=s}};
+const updateMeta=()=>{const n=N0()?.get(cur),e=$('#note-meta');if(n&&e)e.textContent=`Created ${fmt(n.created)} · Updated ${fmt(n.updated)} · ${(n.body.trim().match(/\S+/g)||[]).length} words`};
+const flush=()=>{clearTimeout(timer);const N=N0();if(!dirty||!cur||!N?.get(cur)||!inst)return;setStatus('saving');N.update(cur,{title:$('#note-title').value,body:inst.get()});dirty=false;setTimeout(()=>{if(!dirty)setStatus('saved')},250);updateMeta()};
+const onEdit=()=>{dirty=true;setStatus('unsaved');clearTimeout(timer);timer=setTimeout(flush,700)};
+const ph=m=>`<div class="m-auto text-center text-sm text-muted p-6">${m}</div>`;
+function renderSide(){const sb=R.get('sidebar');app.style.setProperty('--sbw',(sb?.width?sb.width(R.cfg(sb.id)):240)+'px');$('#sidebar').innerHTML=sb?sb.render(K,R.cfg(sb.id)):ph('No sidebar plugin is active.')}
+function renderHead(){const it=K.collect('nav').find(i=>i.filter===view.filter),cid=view.filter.startsWith('cat:')?view.filter.slice(4):null,C=K.svc('categories');
+  $('#list-head').innerHTML=`<div class="flex items-center gap-2"><button data-cmd="nav.toggle" class="md:hidden p-2 rounded-theme border border-line" aria-label="Open menu">${ic('menu')}</button><h2 class="font-heading text-lg font-semibold truncate flex-1">${esc(it?.label||'Notes')}<span id="list-count" class="ml-2 text-xs text-muted font-normal"></span></h2>${cid&&C?.get(cid)?`<button data-cmd="cat.edit" data-arg="${cid}" class="p-2 rounded-theme text-muted hover:text-ink" aria-label="Edit category">${ic('edit')}</button><button data-cmd="cat.delete" data-arg="${cid}" class="p-2 rounded-theme text-muted hover:text-ink" aria-label="Delete category">${ic('trash')}</button>`:''}${K.can('note.create')&&view.filter!=='archive'?`<button data-cmd="note.create" class="${P}">${ic('plus')}New</button>`:''}</div>${K.svc('search')?`<input id="search" type="search" value="${esc(view.q)}" placeholder="Search notes" class="mt-3 w-full px-3 py-2 text-sm rounded-theme bg-surface2 border border-line" aria-label="Search notes">`:''}`}
+function renderBody(){const N=N0(),b=$('#list-body');if(!N){b.innerHTML=ph('The Notes feature is disabled.');return}const nl=R.get('notelist'),list=N.list({filter:view.filter,q:view.q});
+  b.innerHTML=nl?nl.render(K,list,R.cfg(nl.id)):ph('No list plugin is active.');const c=$('#list-count');if(c)c.textContent=list.length}
+function renderDetail(){flush();inst?.destroy();inst=null;cur=null;dirty=false;const N=N0(),D=$('#note-detail'),n=N&&view.noteId&&N.get(view.noteId);
+  if(!n){view.noteId=null;app.classList.remove('has-note');D.innerHTML=ph(N?'Select a note, or create a new one.':'The Notes feature is disabled. Turn it on in Plugins &amp; settings.');return}
+  app.classList.add('has-note');cur=n.id;const C=K.svc('categories');
+  D.innerHTML=`<div class="px-4 sm:px-8 pt-5 pb-3 border-b border-line space-y-3"><div class="flex items-center gap-2"><button data-cmd="note.close" class="lg:hidden p-2 rounded-theme border border-line" aria-label="Back to notes">${ic('back')}</button><input id="note-title" value="${esc(n.title)}" placeholder="Untitled" aria-label="Note title" class="flex-1 min-w-0 bg-transparent outline-none font-heading text-2xl sm:text-3xl font-semibold"></div>
+  <div class="flex flex-wrap items-center gap-2">${C?`<select id="note-cat" aria-label="Category" class="px-2 py-1.5 text-sm rounded-theme bg-surface2 border border-line"><option value="">Uncategorized</option>${C.all().map(x=>`<option value="${x.id}" ${x.id===n.categoryId?'selected':''}>${esc((x.icon?x.icon+' ':'')+x.name)}</option>`).join('')}</select>`:''}
+  ${K.can('note.favorite')?`<button data-cmd="note.favorite" data-arg="${n.id}" aria-pressed="${n.favorite}" class="${B}">${ic('star')}${n.favorite?'Starred':'Star'}</button>`:''}${K.can('note.archive')?`<button data-cmd="note.archive" data-arg="${n.id}" class="${B}">${ic('archive')}${n.archived?'Restore':'Archive'}</button>`:''}${K.can('note.delete')?`<button data-cmd="note.delete" data-arg="${n.id}" class="${B}">${ic('trash')}Delete</button>`:''}<span id="save-status" class="ml-auto text-xs text-muted" aria-live="polite">Saved</span></div><p id="note-meta" class="text-xs text-muted"></p></div><div id="editor-host" class="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 py-5"></div>`;
+  const ed=R.get('editor'),h=$('#editor-host');if(ed){try{inst=ed.mount(h,{value:n.body,onInput:onEdit,cfg:R.cfg(ed.id)})}catch(e){h.innerHTML='<p class="text-sm text-muted">Editor failed: '+esc(e.message)+'</p>'}}else h.innerHTML=ph('No editor plugin is active.');updateMeta()}
+function renderAll(){const nav=K.collect('nav');if(nav.length&&!nav.some(i=>i.filter===view.filter))view.filter='all';renderSide();renderHead();renderBody()}
+const core=(n,f)=>cmd0(n,f);
+core('view.filter',f=>{flush();view.filter=f;view.q='';view.noteId=null;app.classList.remove('nav-open');renderAll();renderDetail()});
+core('note.open',id=>{flush();view.noteId=id;app.classList.remove('nav-open');renderBody();renderDetail()});
+core('note.close',()=>{flush();view.noteId=null;renderBody();renderDetail()});
+core('nav.toggle',()=>app.classList.toggle('nav-open'));
+core('theme.toggle',()=>{const c=R.get('theme'),o=[...R.plugins.values()].find(p=>p.type==='theme'&&p.scheme!==c?.scheme);if(o)R.activate(o.id)});
+core('plugin.use',id=>R.activate(id));
+core('plugin.toggle',id=>R.isOn(id)?R.disable(id):R.enable(id));
+core('plugin.demo',()=>{if(!R.plugins.has('theme.midnight')){window.Workspace.register({id:'theme.midnight',name:'Midnight (runtime)',version:'0.1.0',type:'theme',scheme:'dark',description:'Registered at runtime from the plugin manager.',vars:{surface:'#0B1020',surface2:'#121A30',ink:'#E6EAF5',muted:'#93A0BF',accent:'#5EEAD4','accent-hover':'#99F6E4','accent-ink':'#06201C',line:'rgba(230,234,245,.12)','syn-keyword':'#5EEAD4','syn-string':'#A7F3D0','syn-comment':'#7C8AA8','syn-number':'#FCD34D','syn-fn':'#93C5FD','syn-tag':'#F9A8D4',radius:'.625rem',shadow:'0 1px 2px rgba(0,0,0,.4)'},init(){for(const k in this.vars)root.style.setProperty('--'+k,this.vars[k]);root.style.colorScheme='dark'},dispose(){for(const k in this.vars)root.style.removeProperty('--'+k)}});toast('Midnight theme registered. Switch to it below.')}else toast('Already registered.')});
+const pm=$('#plugin-manager');
+core('settings.toggle',()=>{const o=pm.classList.contains('translate-x-full');pm.classList.toggle('translate-x-full',!o);pm.setAttribute('aria-hidden',String(!o));if(o)renderManager()});
+function field(p,s){const v=R.cfg(p.id)[s.key],a=`data-cfg="${p.id}" data-key="${s.key}" data-t="${s.type}"`;return `<label class="flex items-center justify-between gap-3 text-sm"><span class="text-muted">${s.label}${s.type==='range'?` (${v})`:''}</span>${s.type==='range'?`<input type="range" ${a} min="${s.min}" max="${s.max}" step="${s.step}" value="${v}">`:`<input type="checkbox" ${a} ${v?'checked':''}>`}</label>`}
+function renderManager(){const row=p=>{const ex=CONTRACTS[p.type].ex,on=p.status==='active',needs=p.deps.length?`<p class="text-xs text-muted">Needs: ${p.deps.map(esc).join(', ')}</p>`:'';
+  return `<div class="border border-line rounded-theme p-3 space-y-2"><div class="flex items-start justify-between gap-3"><div class="min-w-0"><div class="font-medium text-sm">${esc(p.name)} <span class="text-xs text-muted">v${p.version}${p._custom?' · custom':''}</span>${['failed','blocked'].includes(p.status)?` <span class="text-xs font-semibold">· ${p.status}</span>`:''}</div><p class="text-xs text-muted">${esc(p.description||'')}</p>${needs}${p._err?`<p class="text-xs">Error: ${esc(p._err)}</p>`:''}</div>${ex?(on?'<span class="text-xs text-muted shrink-0">Active</span>':`<button data-cmd="plugin.use" data-arg="${p.id}" class="${B} shrink-0">Use</button>`):`<input type="checkbox" data-cmd="plugin.toggle" data-arg="${p.id}" ${on?'checked':''} aria-label="Enable ${esc(p.name)}">`}</div>${on&&p.schema?p.schema.map(s=>field(p,s)).join(''):''}${p._custom?`<button data-cmd="plugin.remove" data-arg="${p.id}" class="${B}">Remove plugin</button>`:''}</div>`};
+  pm.innerHTML=`<div class="p-6 space-y-6"><div class="flex items-center justify-between"><h2 class="font-heading text-2xl font-semibold">Plugins &amp; settings</h2><button data-cmd="settings.toggle" class="p-2 rounded-theme border border-line" aria-label="Close">${ic('back')}</button></div><p class="text-sm text-muted">Swap any implementation at runtime. Switching storage copies the current workspace into the new provider. Developers can call <code class="font-mono">Workspace.register(plugin)</code> in the console.</p>
+  ${Object.keys(CONTRACTS).map(t=>{const ps=[...R.plugins.values()].filter(p=>p.type===t);return ps.length?`<section class="space-y-2"><h3 class="text-xs uppercase tracking-wider text-muted">${CONTRACTS[t].label}</h3>${ps.map(row).join('')}</section>`:''}).join('')}<section class="space-y-3 border-t border-line pt-6"><h3 class="text-xs uppercase tracking-wider text-muted">Install a plugin</h3>
+  <p class="text-xs text-muted">Upload or paste a plugin. <b>JSON or YAML</b> can safely define themes and typography. <b>JavaScript</b> (.js) can define any plugin type, runs with full access to this page, and must return a plugin object or an array of them.</p>
+  <textarea id="plugin-src" rows="8" spellcheck="false" aria-label="Plugin source" class="w-full p-3 rounded-theme bg-surface2 border border-line font-mono text-xs"></textarea>
+  <div class="flex flex-wrap gap-2"><button data-cmd="plugin.install" class="${P}">Install</button><label class="${B} cursor-pointer">Upload file<input id="plugin-file" type="file" accept=".js,.json,.yaml,.yml" class="sr-only"></label><button data-cmd="plugin.example" data-arg="json" class="${B}">Theme example</button><button data-cmd="plugin.example" data-arg="hl" class="${B}">Highlighter example</button><button data-cmd="plugin.example" data-arg="js" class="${B}">JS example</button></div>
+  <p id="install-status" class="text-xs text-muted min-h-[1rem]" role="status" aria-live="polite"></p>
+  <details class="text-xs text-muted"><summary class="cursor-pointer">Plugin contracts</summary><ul class="mt-2 space-y-1">${Object.entries(CONTRACTS).map(([t,c])=>`<li><b>${t}</b>: ${['id','name','version','type'].concat(c.req).join(', ')}</li>`).join('')}</ul><p class="mt-2">Optional on every plugin: description, deps, config, schema, init(ctx), dispose(). ctx offers cmd, provide, contribute, on, get, svc and cfg, plus shared helpers. Installed feature plugins start switched off.</p></details></section>
+  <button data-cmd="plugin.demo" class="${B}">Register a demo theme at runtime</button></div>`}
+
+/* ===== Events ===== */
+document.addEventListener('click',e=>{const t=e.target.closest('[data-cmd]');if(t)K.run(t.dataset.cmd,t.dataset.arg)});
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('[role=button][data-cmd]')){e.preventDefault();K.run(e.target.dataset.cmd,e.target.dataset.arg)}if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();flush()}});
+document.addEventListener('input',e=>{if(e.target.id==='note-title')onEdit();if(e.target.id==='search'){view.q=e.target.value;renderBody()}});
+document.addEventListener('change',e=>{const t=e.target;if(t.id==='note-cat'){flush();N0().update(cur,{categoryId:t.value||null});setStatus('saved')}
+  if(t.dataset.cfg){R.setConfig(t.dataset.cfg,t.dataset.key,t.dataset.t==='range'?Number(t.value):t.dataset.t==='toggle'?t.checked:t.value)}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)flush()});addEventListener('pagehide',flush);
+bus.on('flush',flush);bus.on('detail',()=>{renderAll();renderDetail()});
+bus.on('data',()=>{const N=N0();renderSide();renderBody();if(cur&&N&&!N.get(cur)){view.noteId=null;renderDetail()}else updateMeta()});
+bus.on('plugins',()=>{renderAll();renderDetail();if(!pm.classList.contains('translate-x-full'))renderManager()});
+
+window.Workspace={registry:R,kit:K,register:p=>{if(collecting){collecting.push(p);return p}R.register(p);bus.emit('plugins');return p},activate:id=>R.activate(id),enable:id=>R.enable(id),disable:id=>R.disable(id)};
+if(!R.st.active.theme&&matchMedia('(prefers-color-scheme: dark)').matches)R.st.active.theme='theme.graphite';
+/* ===== Plugin installer: data plugins (JSON/YAML) and trusted JS plugins ===== */
+let collecting=null;
+const INST='ws.installed.v1',clean=s=>String(s??'').replace(/[;{}<>]/g,''),readInst=()=>lsGet(INST,[]),writeInst=a=>lsSet(INST,a);
+const setMsg=(m,bad)=>{const e=$('#install-status');if(e){e.textContent=m;e.style.fontWeight=bad?'600':'400'}};
+const fromData=d=>{
+  if(!d||typeof d!=='object')throw Error('A plugin must be an object.');
+  const base={id:String(d.id||'').trim(),name:String(d.name||d.id||''),version:String(d.version||'1.0.0'),type:d.type,description:String(d.description||'')};
+  if(d.type==='theme'){const v={radius:'.625rem',shadow:'0 1px 2px rgba(0,0,0,.06)'};for(const k in(d.vars||{}))v[k]=clean(d.vars[k]);
+    ['surface','surface2','ink','muted','accent','accent-hover','accent-ink','line'].forEach(k=>{if(!v[k])throw Error('theme "vars" is missing "'+k+'".')});
+    const sch=d.scheme==='dark'?'dark':'light';
+    return{...base,scheme:sch,vars:v,init(){for(const k in v)root.style.setProperty('--'+k,v[k]);root.style.colorScheme=sch},dispose(){for(const k in v)root.style.removeProperty('--'+k)}}}
+  if(d.type==='typography'){const st=d.stacks||{},S={};['ui','heading','body','mono'].forEach(k=>S[k]=clean(st[k]||st.body||st.ui||'system-ui,sans-serif'));const url=String(d.fontsUrl||'');
+    return{...base,stacks:S,config:{size:16},schema:[{key:'size',label:'Base size (px)',type:'range',min:14,max:20,step:1}],
+      apply(c){for(const k in S)root.style.setProperty('--font-'+k,S[k]);root.style.setProperty('--fs',c.size+'px');let l=$('#font-link');
+        if(url.startsWith('https://fonts.googleapis.com/')){if(!l){l=document.createElement('link');l.id='font-link';l.rel='stylesheet';document.head.appendChild(l)}if(l.href!==url)l.href=url}else if(l)l.remove()},
+      init(c){this.apply(c.cfg())},onConfig(c){this.apply(c)},dispose(){['ui','heading','body','mono'].forEach(k=>root.style.removeProperty('--font-'+k));root.style.removeProperty('--fs')}}}
+  if(d.type==='highlighter'){const G={},OK=['keyword','string','comment','number','fn','tag','attr'];
+    for(const l in(d.grammars||{})){const rules=d.grammars[l];if(!Array.isArray(rules))throw Error('Grammar "'+l+'" must be a list of [token, pattern] pairs.');
+      G[l.toLowerCase()]=rules.map(r=>{const[c,x]=Array.isArray(r)?r:[r.token,r.pattern];if(!OK.includes(c))throw Error('Unknown token "'+c+'". Use: '+OK.join(', '));if(typeof x!=='string'||x.length>300)throw Error('Each pattern must be a string under 300 characters.');try{new RegExp(x)}catch(e){throw Error('Invalid pattern: '+x)}return[c,x]})}
+    if(!Object.keys(G).length)throw Error('A highlighter needs "grammars", for example {"toml": [["comment", "#.*"]]}.');
+    return{...base,grammars:G}}
+  throw Error('Only "theme", "typography" and "highlighter" plugins can be written as JSON/YAML. Other types need a JavaScript plugin.')};
+const parseData=t=>{try{return JSON.parse(t)}catch(e){if(window.jsyaml)return jsyaml.load(t);throw e}};
+const runJs=src=>{try{return new Function('Workspace','kit',src)(window.Workspace,K)}catch(e){throw Error(e instanceof EvalError?'This page blocks running uploaded JavaScript. JSON/YAML theme and typography plugins still work.':e.message)}};
+const add=(list,live)=>{const ids=[];
+  for(const p of list){
+    if(!p||typeof p!=='object'||!/^[a-z][a-z0-9._-]{2,60}$/.test(p.id||'')||!p.name)throw Error('Each plugin needs an "id" (lowercase, like theme.ocean) and a "name".');
+    const ex=R.plugins.get(p.id);if(ex&&!ex._custom)throw Error('"'+p.id+'" is built in and cannot be replaced.');
+    const was=ex?.status==='active';if(ex){R.stop(ex);R.plugins.delete(p.id)}
+    R.register(p);p._custom=true;
+    if(!ex&&p.type==='feature'&&R.st.enabled[p.id]===undefined)R.st.enabled[p.id]=false;
+    if(live&&was&&!R.start(p))toast(p.name+' failed to start');else if(live&&!ex&&p.type==='highlighter')R.start(p);
+    ids.push(p.id)}
+  R.save();return ids};
+const install=(src,kind,live)=>{let list;
+  if(kind==='js'){collecting=[];try{const out=runJs(src);list=[...collecting,...(out?[].concat(out):[])]}finally{collecting=null}}
+  else{const d=parseData(src);list=(Array.isArray(d)?d:d&&d.plugins?d.plugins:[d]).map(fromData)}
+  if(!list.length)throw Error('No plugin found. A JavaScript plugin must return a plugin object or an array of them.');
+  return add(list,live)};
+core('plugin.install',async()=>{const t=$('#plugin-src');if(!t)return;const src=t.value.trim(),fn=t.dataset.file||'';
+  if(!src)return setMsg('Paste a plugin or upload a file first.',1);
+  const kind=/\.js$/i.test(fn)?'js':/\.(json|ya?ml)$/i.test(fn)?'data':/^\s*[\[{]/.test(src)?'data':(/^\s*[A-Za-z_][\w-]*\s*:\s/.test(src)&&!/\breturn\b|=>|function\b|Workspace\./.test(src))?'data':'js';
+  if(kind==='js'){const d=R.get('dialogs'),msg='JavaScript plugins run with full access to this page, including your notes. Only install code you wrote or trust.';
+    if(!(d?await d.confirm({title:'Run this JavaScript plugin?',message:msg,confirmLabel:'Install and run'}):confirm(msg)))return}
+  try{const ids=install(src,kind,true);writeInst(readInst().filter(x=>!x.ids.some(i=>ids.includes(i))).concat({kind,src,ids}));toast('Installed: '+ids.join(', '));bus.emit('plugins')}
+  catch(e){setMsg(e.message,1)}});
+core('plugin.example',k=>{const t=$('#plugin-src');t.value=$('#ex-'+k).textContent.trim();t.dataset.file='';setMsg('Example loaded. Edit it, then press Install.')});
+core('plugin.remove',id=>{const ent=readInst().find(x=>x.ids.includes(id)),ids=ent?ent.ids:[id],ps=ids.map(i=>R.plugins.get(i)).filter(Boolean);
+  const dep=[...R.plugins.values()].filter(q=>q.status==='active'&&!ids.includes(q.id)&&q.deps.some(d=>ids.includes(d)));
+  if(dep.length)return toast('Disable first: '+dep.map(d=>d.name).join(', '));
+  ps.forEach(p=>{R.stop(p);R.plugins.delete(p.id);delete R.st.enabled[p.id];delete R.st.config[p.id];
+    if(CONTRACTS[p.type].ex&&R.st.active[p.type]===p.id){delete R.st.active[p.type];const f=[...R.plugins.values()].find(q=>q.type===p.type&&q.status!=='failed'&&R.start(q));if(f)R.st.active[p.type]=f.id}});
+  writeInst(readInst().filter(x=>x!==ent&&!x.ids.includes(id)));R.save();bus.emit('plugins');toast('Plugin removed')});
+document.addEventListener('input',e=>{if(e.target.id==='plugin-src')e.target.dataset.file=''});
+document.addEventListener('change',e=>{if(e.target.id!=='plugin-file')return;const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{const t=$('#plugin-src');t.value=r.result;t.dataset.file=f.name;setMsg('Loaded '+f.name+'. Press Install.')};r.onerror=()=>setMsg('Could not read that file.',1);r.readAsText(f);e.target.value=''});
+readInst().forEach(x=>{try{install(x.src,x.kind,false)}catch(e){console.error(e);setTimeout(()=>toast('A saved plugin failed to load: '+e.message),600)}});
+(async()=>{const sp=R.plugins.get(R.st.active.storage);if(sp&&sp.preload){try{await sp.preload()}catch(e){delete R.st.active.storage;setTimeout(()=>toast(sp.name+' could not open ('+e.message+'). Using another storage provider.'),600)}}R.boot();renderAll();renderDetail()})();
+})();
+</script>
+</body>
+</html>
