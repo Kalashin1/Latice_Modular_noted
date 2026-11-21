@@ -107,6 +107,7 @@ L.uninstall = pluginId => localStorage.setItem(INST, JSON.stringify(L.installed(
 @media(prefers-color-scheme:dark){:root{--surface:#151517;--surface2:#1E1E21;--ink:#ECECEA;--muted:#9A9AA0;--accent:#8FA0FF;--accent-hover:#AAB7FF;--accent-ink:#11131F;--line:rgba(255,255,255,.1);color-scheme:dark}}
 body{margin:0;background:var(--surface);color:var(--ink);font:16px/1.5 'Inter',system-ui,sans-serif;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ib{display:inline-grid;place-items:center;width:2.25rem;height:2.25rem;border-radius:var(--radius);border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;transition:background .15s}.ib:hover{background:var(--surface2)}.ib:focus-within{outline:2px solid var(--accent);outline-offset:2px}.ib.pri{background:var(--accent);color:var(--accent-ink);border-color:transparent}.ib.pri:hover{background:var(--accent-hover)}
 pre,code,textarea{font-family:'JetBrains Mono',ui-monospace,monospace}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -122,8 +123,8 @@ addEventListener("unhandledrejection",function(e){showFatal((e.reason&&e.reason.
   <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-3">
     <a href="#" class="text-xl font-semibold tracking-tight">Lattice <span class="text-muted font-normal">Store</span></a>
     <nav class="ml-auto flex items-center gap-2" aria-label="Store">
-      <a href="index.html" class="px-3 py-1.5 rounded-theme border border-line hover:bg-surface2 text-sm">Open notes</a>
-      <button data-act="firebase" class="px-3 py-1.5 rounded-theme border border-line hover:bg-surface2 text-sm">Firebase</button>
+      <a href="index.html" class="ib" aria-label="Open notes" title="Open notes"><svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM9 12h7M9 16h7"/></svg></a>
+      <button data-act="firebase" class="ib" aria-label="Firebase settings" title="Firebase settings"><svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3v5M15 3v5M7 8h10v3a5 5 0 0 1-10 0zM12 16v5"/></svg></button>
       <span id="auth"></span>
     </nav>
   </div>
@@ -145,16 +146,16 @@ addEventListener("unhandledrejection",function(e){showFatal((e.reason&&e.reason.
 };'></textarea>
     <p id="cfg-msg" class="text-sm min-h-[1.25rem]" role="status" aria-live="polite"></p>
     <div class="flex flex-wrap gap-2">
-      <button data-act="save-config" class="px-4 py-2 rounded-theme bg-accent text-accentInk hover:bg-accentHover text-sm font-medium">Save and connect</button>
-      <button data-act="clear-config" class="px-4 py-2 rounded-theme border border-line hover:bg-surface2 text-sm">Remove saved config</button>
-      <button data-act="close-setup" class="px-4 py-2 rounded-theme border border-line hover:bg-surface2 text-sm" id="cfg-cancel" hidden>Back to store</button>
+      <button data-act="save-config" class="ib pri" aria-label="Save and connect" title="Save and connect"><svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></button>
+      <button data-act="clear-config" class="ib" aria-label="Remove saved config" title="Remove saved config"><svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+      <button data-act="close-setup" class="ib" id="cfg-cancel" hidden aria-label="Back to store" title="Back to store"><svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
     </div>
   </section>
 
   <section id="catalog" data-section="catalog" hidden class="space-y-6">
     <div class="flex flex-wrap items-center gap-3">
       <div class="flex gap-1" role="tablist" aria-label="Store sections" id="tabs"></div>
-      <button data-act="publish" class="ml-auto px-4 py-2 rounded-theme bg-accent text-accentInk hover:bg-accentHover text-sm font-medium">Publish a plugin</button>
+      <button data-act="publish" class="ib pri ml-auto" aria-label="Publish a plugin" title="Publish a plugin"><svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg></button>
     </div>
     <div id="filters" class="flex flex-wrap items-center gap-2">
       <div id="chips" class="flex flex-wrap gap-1"></div>
@@ -174,6 +175,9 @@ const $=(s,r=document)=>r.querySelector(s),FB=window.LatticeFB;
 if(!FB)window.showFatal('The Firebase layer did not load.');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let tt;const toast=m=>{const t=$('#toast');t.textContent=m;t.style.opacity=1;clearTimeout(tt);tt=setTimeout(()=>t.style.opacity=0,3200)};
+const ICONS={"notes":"<path d=\"M6 3h9l4 4v14H6zM9 12h7M9 16h7\"/>","plug":"<path d=\"M9 3v5M15 3v5M7 8h10v3a5 5 0 0 1-10 0zM12 16v5\"/>","check":"<path d=\"M5 12.5l4.5 4.5L19 7\"/>","trash":"<path d=\"M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3\"/>","back":"<path d=\"M15 5l-7 7 7 7\"/>","upload":"<path d=\"M12 16V4M7 9l5-5 5 5M5 20h14\"/>","download":"<path d=\"M12 4v12M7 11l5 5 5-5M5 20h14\"/>","refresh":"<path d=\"M20 11a8 8 0 0 0-14-4L4 9M4 4v5h5M4 13a8 8 0 0 0 14 4l2-2M20 20v-5h-5\"/>","code":"<path d=\"M8 8l-4 4 4 4M16 8l4 4-4 4M14 5l-4 14\"/>","edit":"<path d=\"M4 20h4L19 9l-4-4L4 16z\"/>","x":"<path d=\"M6 6l12 12M18 6L6 18\"/>","login":"<path d=\"M10 17l5-5-5-5M15 12H3M14 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5\"/>","logout":"<path d=\"M14 17l5-5-5-5M19 12H7M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5\"/>"};
+const ic=(n,c='w-[18px] h-[18px]')=>`<svg class="${c}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]}</svg>`;
+const IB=(label,icon,attrs='',pri)=>`<button type="button" ${attrs} aria-label="${esc(label)}" title="${esc(label)}" class="ib${pri?' pri':''}">${ic(icon)}</button>`;
 const BTN='px-3 py-1.5 rounded-theme border border-line hover:bg-surface2 text-sm',PRI='px-3 py-1.5 rounded-theme bg-accent text-accentInk hover:bg-accentHover text-sm font-medium';
 const S={user:null,admin:false,items:[],tab:'browse',type:'all',q:'',off:null};
 const TYPES={theme:'Theme',typography:'Font',icons:'Icons',highlighter:'Highlighter'},DATA=Object.keys(TYPES),ALL_TYPES=['theme','typography','icons','highlighter','editor','sidebar','notelist','storage','dialogs','feature'];
@@ -198,7 +202,7 @@ function showSetup(back){$('#setup').hidden=false;$('#catalog').hidden=true;$('#
 function saveConfig(){const m=$('#cfg-msg');try{FB.saveConfig(FB.parseConfig($('#cfg').value));m.textContent='Saved. Connecting…';location.reload()}catch(e){m.textContent=e.message;m.style.fontWeight=600}}
 
 /* ---- rendering ---- */
-function renderAuth(){$('#auth').innerHTML=S.user?`<span class="flex items-center gap-2 text-sm">${S.user.photoURL?`<img src="${esc(S.user.photoURL)}" alt="" class="w-7 h-7 rounded-full" referrerpolicy="no-referrer">`:''}<span class="hidden sm:inline">${esc(S.user.displayName||S.user.email)}${S.admin?' · admin':''}</span><button data-act="signout" class="${BTN}">Sign out</button></span>`:`<button data-act="signin" class="${PRI}">Sign in with Google</button>`;
+function renderAuth(){$('#auth').innerHTML=S.user?`<span class="flex items-center gap-2 text-sm">${S.user.photoURL?`<img src="${esc(S.user.photoURL)}" alt="" class="w-7 h-7 rounded-full" referrerpolicy="no-referrer">`:''}<span class="hidden sm:inline">${esc(S.user.displayName||S.user.email)}${S.admin?' · admin':''}</span>${IB('Sign out','logout','data-act="signout"')}</span>`:IB('Sign in with Google','login','data-act="signin"',1);
   $('#tabs').innerHTML=[['browse','Browse'],...(S.user?[['mine','My plugins']]:[]),...(S.admin?[['review','Review']]:[])].map(([k,t])=>`<button role="tab" aria-selected="${S.tab===k}" data-tab="${k}" class="px-3 py-1.5 text-sm rounded-theme ${S.tab===k?'bg-accent text-accentInk':'border border-line hover:bg-surface2'}">${t}</button>`).join('')}
 function preview(x){if(x.kind==='script')return '<p class="text-xs text-muted">JavaScript plugin. Runs with full access to Lattice once installed.</p>';const d=parse(x.source)||{};
   if(x.type==='theme'){const v=d.vars||{};return `<div class="flex h-8 rounded-theme overflow-hidden border border-line">${['surface','surface2','ink','accent','syn-keyword','syn-string'].map(k=>`<span class="flex-1" style="background:${col(v[k])}" title="${k}"></span>`).join('')}</div>`}
@@ -207,12 +211,12 @@ function preview(x){if(x.kind==='script')return '<p class="text-xs text-muted">J
   if(x.type==='highlighter')return `<p class="text-xs text-muted truncate">Languages: ${esc(Object.keys(d.grammars||{}).join(', '))}</p>`;return ''}
 const badge=x=>x.status==='approved'?'':`<span class="text-xs px-2 py-0.5 rounded-full border border-line">${x.status==='pending'?'Pending review':esc(x.status)}</span>`;
 function card(x,mode){const inst=FB.isInstalled(x.pluginId),upd=inst&&inst.store&&inst.store.version!==x.version,own=S.user&&x.authorUid===S.user.uid;
-  const act=mode==='review'?`<button data-act="approve" data-id="${esc(x.id)}" class="${PRI}">Approve</button><button data-act="reject" data-id="${esc(x.id)}" class="${BTN}">Reject</button>`
-    :mode==='mine'?`<button data-act="edit" data-id="${esc(x.id)}" class="${BTN}">Update</button><button data-act="delete" data-id="${esc(x.id)}" class="${BTN}">Delete</button>`
-    :inst?`${upd?`<button data-act="install" data-id="${esc(x.id)}" class="${PRI}">Update to v${esc(x.version)}</button>`:'<span class="text-sm text-muted px-2 py-1.5">Installed</span>'}<button data-act="uninstall" data-pid="${esc(x.pluginId)}" class="${BTN}">Remove</button>`
-    :`<button data-act="install" data-id="${esc(x.id)}" class="${PRI}">Install</button>`;
+  const act=mode==='review'?IB('Approve','check',`data-act="approve" data-id="${esc(x.id)}"`,1)+IB('Reject','x',`data-act="reject" data-id="${esc(x.id)}"`)
+    :mode==='mine'?IB('Update this plugin','edit',`data-act="edit" data-id="${esc(x.id)}"`)+IB('Delete','trash',`data-act="delete" data-id="${esc(x.id)}"`)
+    :inst?`${upd?IB('Update to v'+x.version,'refresh',`data-act="install" data-id="${esc(x.id)}"`,1):`<span class="ib" style="border-color:transparent;color:var(--muted)" title="Installed" aria-label="Installed">${ic('check')}</span>`}${IB('Remove from Lattice','trash',`data-act="uninstall" data-pid="${esc(x.pluginId)}"`)}`
+    :IB('Install','download',`data-act="install" data-id="${esc(x.id)}"`,1);
   return `<article class="border border-line rounded-theme bg-surface2 p-4 flex flex-col gap-3"><div class="flex items-start justify-between gap-2"><div class="min-w-0"><h3 class="font-semibold truncate">${esc(x.name)}</h3><p class="text-xs text-muted">v${esc(x.version)} · ${esc(x.authorName||'Unknown')}${own?' (you)':''}</p></div><span class="text-xs px-2 py-0.5 rounded-full bg-surface border border-line shrink-0">${esc(label(x))}</span></div>
-  <p class="text-sm text-muted line-clamp-3">${esc(x.description||'No description.')}</p>${preview(x)}<div class="flex flex-wrap items-center gap-2 mt-auto pt-1">${act}<button data-act="source" data-id="${esc(x.id)}" class="${BTN}">Source</button>${badge(x)}</div></article>`}
+  <p class="text-sm text-muted line-clamp-3">${esc(x.description||'No description.')}</p>${preview(x)}<div class="flex flex-wrap items-center gap-2 mt-auto pt-1">${act}${IB('View source','code',`data-act="source" data-id="${esc(x.id)}"`)}${badge(x)}</div></article>`}
 function renderGrid(){renderAuth();const q=S.q.toLowerCase();
   $('#chips').innerHTML=[['all','All'],['theme','Themes'],['typography','Fonts'],['icons','Icons'],['highlighter','Highlighters'],['script','Scripts']].map(([k,t])=>`<button data-type="${k}" aria-pressed="${S.type===k}" class="px-3 py-1 text-sm rounded-full ${S.type===k?'bg-accent text-accentInk':'border border-line hover:bg-surface2'}">${t}</button>`).join('');
   $('#filters').hidden=S.tab==='review';
@@ -223,9 +227,9 @@ const msg=t=>{$('#msg').textContent=t};
 
 /* ---- actions ---- */
 const find=id=>S.items.find(x=>x.id===id);
-async function viewSource(x){await modal(`<h2 class="text-lg font-semibold">${esc(x.name)} <span class="text-muted text-sm font-normal">v${esc(x.version)}</span></h2><pre class="text-xs bg-surface2 border border-line rounded-theme p-3 max-h-80 overflow-auto whitespace-pre-wrap break-all">${esc(x.source)}</pre><div class="flex justify-end"><button data-x class="${BTN}">Close</button></div>`)}
+async function viewSource(x){await modal(`<h2 class="text-lg font-semibold">${esc(x.name)} <span class="text-muted text-sm font-normal">v${esc(x.version)}</span></h2><pre class="text-xs bg-surface2 border border-line rounded-theme p-3 max-h-80 overflow-auto whitespace-pre-wrap break-all">${esc(x.source)}</pre><div class="flex justify-end">${IB('Close','x','data-x')}</div>`)}
 async function install(x){
-  if(x.kind==='script'){const ok=await modal(`<h2 class="text-lg font-semibold">Install JavaScript plugin?</h2><p class="text-sm text-muted">Scripts run with full access to Lattice, including your notes. This one was reviewed by an admin, but read it first and only install code you trust.</p><pre class="text-xs bg-surface2 border border-line rounded-theme p-3 max-h-64 overflow-auto whitespace-pre-wrap break-all">${esc(x.source)}</pre><div class="flex justify-end gap-2"><button data-x class="${BTN}">Cancel</button><button data-ok class="${PRI}">Install and run</button></div>`);if(!ok)return}
+  if(x.kind==='script'){const ok=await modal(`<h2 class="text-lg font-semibold">Install JavaScript plugin?</h2><p class="text-sm text-muted">Scripts run with full access to Lattice, including your notes. This one was reviewed by an admin, but read it first and only install code you trust.</p><pre class="text-xs bg-surface2 border border-line rounded-theme p-3 max-h-64 overflow-auto whitespace-pre-wrap break-all">${esc(x.source)}</pre><div class="flex justify-end gap-2">${IB('Cancel','x','data-x')}${IB('Install and run','download','data-ok',1)}</div>`);if(!ok)return}
   try{await FB.install(x);toast(`${x.name} installed. Open Lattice to use it.`);renderGrid()}catch(e){toast(e.message)}}
 function analyze(text){const d=parse(text);if(d&&typeof d==='object'&&!Array.isArray(d)&&DATA.includes(d.type))return{kind:'data',meta:{pluginId:d.id,name:d.name,version:d.version||'1.0.0',type:d.type,description:d.description||''}};return{kind:'script',meta:null}}
 function validateData(d){if(d.type==='theme'){const v=d.vars||{};['surface','surface2','ink','muted','accent','accent-hover','accent-ink','line'].forEach(k=>{if(!v[k])throw Error('Theme vars is missing "'+k+'".')})}
@@ -236,10 +240,10 @@ async function openPublish(edit){if(!S.user)return toast('Sign in to publish.');
   const f=(id,l,v='',ro)=>`<label class="block text-sm"><span class="text-muted">${l}</span><input id="${id}" value="${esc(v)}" ${ro?'readonly':''} class="mt-1 w-full px-3 py-2 rounded-theme bg-surface2 border border-line"></label>`;
   const p=modal(`<h2 class="text-lg font-semibold">${edit?'Update plugin':'Publish a plugin'}</h2><p class="text-sm text-muted">Themes, fonts, icon sets and highlighters (JSON or YAML) go live immediately. Scripts (.js) are reviewed by an admin first.</p>
   <textarea id="pub-src" rows="7" spellcheck="false" aria-label="Plugin source" class="w-full p-3 rounded-theme bg-surface2 border border-line text-xs">${esc(edit?edit.source:'')}</textarea>
-  <label class="inline-block ${BTN} cursor-pointer">Upload file<input id="pub-file" type="file" accept=".js,.json,.yaml,.yml" class="sr-only"></label>
+  <label class="ib" title="Upload a file" aria-label="Upload a file">${ic('upload')}<input id="pub-file" type="file" accept=".js,.json,.yaml,.yml" class="sr-only"></label>
   <div class="grid grid-cols-2 gap-3">${f('m-id','Plugin id (e.g. theme.ocean)',edit?edit.pluginId:'',!!edit)}${f('m-name','Name',edit?edit.name:'')}${f('m-ver','Version (1.0.0)',edit?edit.version:'1.0.0')}
   <label class="block text-sm"><span class="text-muted">Type</span><select id="m-type" class="mt-1 w-full px-3 py-2 rounded-theme bg-surface2 border border-line">${ALL_TYPES.map(t=>`<option ${edit&&edit.type===t?'selected':''}>${t}</option>`).join('')}</select></label></div>${f('m-desc','Description',edit?edit.description:'')}
-  <p id="pub-msg" class="text-sm min-h-[1.25rem]" role="status" aria-live="polite"></p><div class="flex justify-end gap-2"><button data-x class="${BTN}">Cancel</button><button data-ok="go" class="${PRI}">${edit?'Update':'Publish'}</button></div>`);
+  <p id="pub-msg" class="text-sm min-h-[1.25rem]" role="status" aria-live="polite"></p><div class="flex justify-end gap-2">${IB('Cancel','x','data-x')}${IB(edit?'Update plugin':'Publish','check','data-ok="go"',1)}</div>`);
   const fill=()=>{const a=analyze($('#pub-src').value);if(a.kind==='data'&&a.meta){const m=a.meta;if(!edit)$('#m-id').value=m.pluginId||'';$('#m-name').value=m.name||'';$('#m-ver').value=m.version;$('#m-type').value=m.type;$('#m-desc').value=m.description}};
   $('#pub-src').addEventListener('input',fill);
   $('#pub-file').addEventListener('change',e=>{const fl=e.target.files[0];if(!fl)return;const r=new FileReader();r.onload=()=>{$('#pub-src').value=r.result;fill()};r.readAsText(fl)});
