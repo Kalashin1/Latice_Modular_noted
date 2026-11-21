@@ -125,8 +125,8 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6),now=
 const lsGet=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch(e){return d}},lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 const fmt=t=>new Date(t).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
 const TODO='https://claude.ai/artifact/Ca5GsbH9CWt3k8m3qsJB3N';
-const ICON={plus:'<path d="M12 5v14M5 12h14"/>',star:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',archive:'<path d="M3 5h18v4H3zM5 9v10h14V9M10 13h4"/>',trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',back:'<path d="M15 5l-7 7 7 7"/>',settings:'<path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M8 15v4"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"/>',moon:'<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',notes:'<path d="M6 3h9l4 4v14H6zM9 12h7M9 16h7"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/>',folder:'<path d="M3 6h6l2 2h10v11H3z"/>',check:'<path d="M5 12.5l4.5 4.5L19 7"/>',code:'<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M14 5l-4 14"/>'};
-const ic=(n,c='w-4 h-4')=>`<svg class="${c}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[n]||''}</svg>`;
+const ICON={plus:'<path d="M12 5v14M5 12h14"/>',star:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',archive:'<path d="M3 5h18v4H3zM5 9v10h14V9M10 13h4"/>',trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',back:'<path d="M15 5l-7 7 7 7"/>',settings:'<path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 5v4M8 15v4"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"/>',moon:'<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',notes:'<path d="M6 3h9l4 4v14H6zM9 12h7M9 16h7"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/>',folder:'<path d="M3 6h6l2 2h10v11H3z"/>',check:'<path d="M5 12.5l4.5 4.5L19 7"/>',code:'<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M14 5l-4 14"/>',store:'<path d="M5 8h14l-1 12H6zM9 8V6a3 3 0 0 1 6 0v2"/>'};
+let ICONSET={};const ic=(n,c='w-4 h-4')=>`<svg class="${c}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONSET[n]||ICON[n]||''}</svg>`;
 const B='px-3 py-1.5 rounded-theme border border-line hover:bg-surface2 text-sm inline-flex items-center gap-1.5',P='px-3 py-1.5 rounded-theme bg-accent text-accentInk hover:bg-accentHover text-sm font-medium inline-flex items-center gap-1.5';
 let tt;const toast=m=>{const t=$('#toast');t.textContent=m;t.style.opacity=1;clearTimeout(tt);tt=setTimeout(()=>t.style.opacity=0,2400)};
 
@@ -140,11 +140,11 @@ const K={view,bus,esc,ic,fmt,toast,B,P,
   cat:n=>services.get('categories')?.get(n.categoryId)||null,
   excerpt:(n,l=140)=>n.body.replace(/[#>*`_\[\]()]/g,'').replace(/\s+/g,' ').trim().slice(0,l),
   empty:'<p class="p-6 text-sm text-muted">No notes here yet.</p>',
-  tools:()=>[{cmd:'theme.toggle',icon:R.get('theme')?.scheme==='dark'?'sun':'moon',label:'Light / dark'},{cmd:'settings.toggle',icon:'settings',label:'Plugins & settings'},{href:TODO,icon:'check',label:'Todo app'}],
+  tools:()=>[{cmd:'theme.toggle',icon:R.get('theme')?.scheme==='dark'?'sun':'moon',label:'Light / dark'},{cmd:'settings.toggle',icon:'settings',label:'Plugins & settings'},{href:'store.html',icon:'store',label:'Plugin store'},{href:TODO,icon:'check',label:'Todo app'}],
   tool:(t,compact)=>{const tag=t.href?'a':'button',a=t.href?`href="${t.href}" target="_blank" rel="noopener"`:`data-cmd="${t.cmd}"`;return `<${tag} ${a} title="${t.label}" aria-label="${t.label}" class="flex items-center gap-2 px-2.5 py-1.5 rounded-theme text-sm text-muted hover:bg-surface2 hover:text-ink">${ic(t.icon)}${compact?'':`<span>${t.label}</span>`}</${tag}>`}};
 
 /* ===== Plugin registry: contracts, lifecycle, dependencies, runtime swap ===== */
-const CONTRACTS={storage:{ex:1,label:'Storage',req:['read','write']},theme:{ex:1,label:'Themes',req:['vars']},typography:{ex:1,label:'Typography',req:['stacks']},editor:{ex:1,label:'Editors',req:['mount']},sidebar:{ex:1,label:'Sidebars',req:['render']},notelist:{ex:1,label:'Note lists',req:['render']},dialogs:{ex:1,label:'Dialogs',req:['confirm','form']},highlighter:{ex:0,label:'Syntax highlighters',req:['grammars']},feature:{ex:0,label:'Features',req:[]}};
+const CONTRACTS={storage:{ex:1,label:'Storage',req:['read','write']},theme:{ex:1,label:'Themes',req:['vars']},typography:{ex:1,label:'Typography',req:['stacks']},editor:{ex:1,label:'Editors',req:['mount']},sidebar:{ex:1,label:'Sidebars',req:['render']},notelist:{ex:1,label:'Note lists',req:['render']},dialogs:{ex:1,label:'Dialogs',req:['confirm','form']},icons:{ex:1,label:'Icon sets',req:['icons']},highlighter:{ex:0,label:'Syntax highlighters',req:['grammars']},feature:{ex:0,label:'Features',req:[]}};
 const R={plugins:new Map(),st:lsGet('ws.plugins.v2',{active:{},enabled:{},config:{}}),
   register(p){const c=CONTRACTS[p.type];if(!c)throw Error('Unknown plugin type: '+p.type);const miss=c.req.filter(k=>!(k in p));if(miss.length)throw Error(p.id+' is missing: '+miss.join(', '));p.deps=p.deps||[];p.status='inactive';this.plugins.set(p.id,p);return p},
   isOn(id){return this.plugins.get(id)?.status==='active'},
@@ -177,6 +177,7 @@ const R={plugins:new Map(),st:lsGet('ws.plugins.v2',{active:{},enabled:{},config
     pass();all().forEach(p=>{if(W(p)&&p.status==='inactive')p.status='blocked'});this.save()}};
 const cmd0=(n,f)=>commands.set(n,f);
 
+R.register({id:'icons.outline',name:'Outline (default)',version:'1.0.0',type:'icons',description:'The built-in outline icons.',icons:{},init(){ICONSET={}},dispose(){ICONSET={}}});
 /* ===== Plugins: storage ===== */
 R.register({id:'storage.local',name:'Browser localStorage',version:'1.0.0',type:'storage',description:'Keeps notes in this browser between sessions.',read:ns=>lsGet('ws.data.'+ns,null),write:(ns,d)=>lsSet('ws.data.'+ns,d)});
 const mem=new Map();
@@ -392,12 +393,17 @@ const fromData=d=>{
       apply(c){for(const k in S)root.style.setProperty('--font-'+k,S[k]);root.style.setProperty('--fs',c.size+'px');let l=$('#font-link');
         if(url.startsWith('https://fonts.googleapis.com/')){if(!l){l=document.createElement('link');l.id='font-link';l.rel='stylesheet';document.head.appendChild(l)}if(l.href!==url)l.href=url}else if(l)l.remove()},
       init(c){this.apply(c.cfg())},onConfig(c){this.apply(c)},dispose(){['ui','heading','body','mono'].forEach(k=>root.style.removeProperty('--font-'+k));root.style.removeProperty('--fs')}}}
+  if(d.type==='icons'){const OT=new Set(['path','circle','rect','line','polyline','polygon','ellipse','g']),OA=new Set(['d','cx','cy','r','rx','ry','x','y','x1','y1','x2','y2','width','height','points','transform','fill','stroke-width','opacity']),I={};
+    const cs=m=>{try{const doc=new DOMParser().parseFromString('<svg xmlns="http://www.w3.org/2000/svg">'+m+'</svg>','image/svg+xml');if(doc.querySelector('parsererror'))return null;const walk=n=>[...n.children].forEach(c=>{if(!OT.has(c.localName))return c.remove();[...c.attributes].forEach(a=>{if(!OA.has(a.name))c.removeAttribute(a.name)});walk(c)});walk(doc.documentElement);return doc.documentElement.innerHTML}catch(e){return null}};
+    for(const k in(d.icons||{})){if(!(k in ICON))continue;const c=cs(String(d.icons[k]));if(c==null)throw Error('Icon "'+k+'" is not valid SVG.');I[k]=c}
+    if(!Object.keys(I).length)throw Error('An icon set needs an "icons" object using names like '+Object.keys(ICON).slice(0,6).join(', ')+'.');
+    return{...base,icons:I,init(){ICONSET=I},dispose(){ICONSET={}}}}
   if(d.type==='highlighter'){const G={},OK=['keyword','string','comment','number','fn','tag','attr'];
     for(const l in(d.grammars||{})){const rules=d.grammars[l];if(!Array.isArray(rules))throw Error('Grammar "'+l+'" must be a list of [token, pattern] pairs.');
       G[l.toLowerCase()]=rules.map(r=>{const[c,x]=Array.isArray(r)?r:[r.token,r.pattern];if(!OK.includes(c))throw Error('Unknown token "'+c+'". Use: '+OK.join(', '));if(typeof x!=='string'||x.length>300)throw Error('Each pattern must be a string under 300 characters.');try{new RegExp(x)}catch(e){throw Error('Invalid pattern: '+x)}return[c,x]})}
     if(!Object.keys(G).length)throw Error('A highlighter needs "grammars", for example {"toml": [["comment", "#.*"]]}.');
     return{...base,grammars:G}}
-  throw Error('Only "theme", "typography" and "highlighter" plugins can be written as JSON/YAML. Other types need a JavaScript plugin.')};
+  throw Error('Only "theme", "typography", "icons" and "highlighter" plugins can be written as JSON/YAML. Other types need a JavaScript plugin.')};
 const parseData=t=>{try{return JSON.parse(t)}catch(e){if(window.jsyaml)return jsyaml.load(t);throw e}};
 const runJs=src=>{try{return new Function('Workspace','kit',src)(window.Workspace,K)}catch(e){throw Error(e instanceof EvalError?'This page blocks running uploaded JavaScript. JSON/YAML theme and typography plugins still work.':e.message)}};
 const add=(list,live)=>{const ids=[];
@@ -414,7 +420,7 @@ const install=(src,kind,live)=>{let list;
   if(kind==='js'){collecting=[];try{const out=runJs(src);list=[...collecting,...(out?[].concat(out):[])]}finally{collecting=null}}
   else{const d=parseData(src);list=(Array.isArray(d)?d:d&&d.plugins?d.plugins:[d]).map(fromData)}
   if(!list.length)throw Error('No plugin found. A JavaScript plugin must return a plugin object or an array of them.');
-  return add(list,live)};
+  const ids=add(list,live);ids.forEach(i=>{R.plugins.get(i)._src=src});return ids};
 core('plugin.install',async()=>{const t=$('#plugin-src');if(!t)return;const src=t.value.trim(),fn=t.dataset.file||'';
   if(!src)return setMsg('Paste a plugin or upload a file first.',1);
   const kind=/\.js$/i.test(fn)?'js':/\.(json|ya?ml)$/i.test(fn)?'data':/^\s*[\[{]/.test(src)?'data':(/^\s*[A-Za-z_][\w-]*\s*:\s/.test(src)&&!/\breturn\b|=>|function\b|Workspace\./.test(src))?'data':'js';
@@ -433,6 +439,9 @@ document.addEventListener('input',e=>{if(e.target.id==='plugin-src')e.target.dat
 document.addEventListener('change',e=>{if(e.target.id!=='plugin-file')return;const f=e.target.files[0];if(!f)return;const r=new FileReader();
   r.onload=()=>{const t=$('#plugin-src');t.value=r.result;t.dataset.file=f.name;setMsg('Loaded '+f.name+'. Press Install.')};r.onerror=()=>setMsg('Could not read that file.',1);r.readAsText(f);e.target.value=''});
 readInst().forEach(x=>{try{install(x.src,x.kind,false)}catch(e){console.error(e);setTimeout(()=>toast('A saved plugin failed to load: '+e.message),600)}});
+addEventListener('storage',e=>{if(e.key!==INST)return;const list=readInst(),have=new Set(list.flatMap(x=>x.ids));
+  list.forEach(x=>{if(x.ids.some(i=>!R.plugins.has(i)||R.plugins.get(i)._src!==x.src)){try{install(x.src,x.kind,true);bus.emit('plugins');toast('Plugin installed from the store')}catch(err){toast('Plugin failed: '+err.message)}}});
+  if([...R.plugins.values()].some(p=>p._custom&&!have.has(p.id)))toast('Reload to finish removing plugins')});
 (async()=>{const sp=R.plugins.get(R.st.active.storage);if(sp&&sp.preload){try{await sp.preload()}catch(e){delete R.st.active.storage;setTimeout(()=>toast(sp.name+' could not open ('+e.message+'). Using another storage provider.'),600)}}R.boot();renderAll();renderDetail()})();
 })();
 </script>
