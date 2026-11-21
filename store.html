@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lattice Plugin Store</title>
+<meta name="description" content="Browse, publish and install Lattice plugins: themes, fonts, icon sets, highlighters and scripts.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono&display=swap">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+<script>
+tailwind.config={theme:{extend:{colors:{surface:'var(--surface)',surface2:'var(--surface2)',ink:'var(--ink)',muted:'var(--muted)',accent:'var(--accent)',accentHover:'var(--accent-hover)',accentInk:'var(--accent-ink)',line:'var(--line)'},borderRadius:{theme:'var(--radius)'}}}};
+</script>
+<script src="firebase-config.js"></script>
+<script src="lattice-firebase.js"></script>
+<style>
+:root{--surface:#FAFAF9;--surface2:#F3F3F1;--ink:#1C1C1A;--muted:#66665F;--accent:#4457D6;--accent-hover:#3345B8;--accent-ink:#fff;--line:rgba(28,28,26,.12);--radius:.625rem;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--surface:#151517;--surface2:#1E1E21;--ink:#ECECEA;--muted:#9A9AA0;--accent:#8FA0FF;--accent-hover:#AAB7FF;--accent-ink:#11131F;--line:rgba(255,255,255,.1);color-scheme:dark}}
+body{margin:0;background:var(--surface);color:var(--ink);font:16px/1.5 'Inter',system-ui,sans-serif;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+pre,code,textarea{font-family:'JetBrains Mono',ui-monospace,monospace}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header id="navbar" data-section="navbar" class="sticky top-0 z-20 bg-surface/90 backdrop-blur border-b border-line">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-3">
+    <a href="#" class="text-xl font-semibold tracking-tight">Lattice <span class="text-muted font-normal">Store</span></a>
+    <nav class="ml-auto flex items-center gap-2" aria-label="Store">
+      <a href="index.html" class="px-3 py-1.5 rounded-theme border border-line hover:bg-surface2 text-sm">Open notes</a>
+      <button data-act="firebase" class="px-3 py-1.5 rounded-theme border border-line hover:bg-surface2 text-sm">Firebase</button>
+      <span id="auth"></span>
+    </nav>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+  <section id="setup" data-section="setup" hidden class="max-w-2xl mx-auto py-8 space-y-4">
+    <h1 class="text-3xl font-semibold tracking-tight">Connect Firebase</h1>
+    <p class="text-muted">The store keeps plugins in your own Firebase project. Paste the web app config object from <b>Project settings → Your apps</b>, exactly as the console shows it. Nothing is sent anywhere except to your Firebase project.</p>
+    <div id="setup-current" class="text-sm text-muted"></div>
+    <textarea id="cfg" rows="10" spellcheck="false" aria-label="Firebase config object" class="w-full p-3 rounded-theme bg-surface2 border border-line text-xs" placeholder='const firebaseConfig = {
+  apiKey: "...",
+  authDomain: "your-project.firebaseapp.com",
+  projectId: "your-project",
+  storageBucket: "your-project.appspot.com",
+  messagingSenderId: "...",
+  appId: "..."
+};'></textarea>
+    <p id="cfg-msg" class="text-sm min-h-[1.25rem]" role="status" aria-live="polite"></p>
+    <div class="flex flex-wrap gap-2">
+      <button data-act="save-config" class="px-4 py-2 rounded-theme bg-accent text-accentInk hover:bg-accentHover text-sm font-medium">Save and connect</button>
+      <button data-act="clear-config" class="px-4 py-2 rounded-theme border border-line hover:bg-surface2 text-sm">Remove saved config</button>
+      <button data-act="close-setup" class="px-4 py-2 rounded-theme border border-line hover:bg-surface2 text-sm" id="cfg-cancel" hidden>Back to store</button>
+    </div>
+  </section>
+
+  <section id="catalog" data-section="catalog" hidden class="space-y-6">
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="flex gap-1" role="tablist" aria-label="Store sections" id="tabs"></div>
+      <button data-act="publish" class="ml-auto px-4 py-2 rounded-theme bg-accent text-accentInk hover:bg-accentHover text-sm font-medium">Publish a plugin</button>
+    </div>
+    <div id="filters" class="flex flex-wrap items-center gap-2">
+      <div id="chips" class="flex flex-wrap gap-1"></div>
+      <input id="q" type="search" placeholder="Search plugins" aria-label="Search plugins" class="ml-auto w-full sm:w-64 px-3 py-2 text-sm rounded-theme bg-surface2 border border-line">
+    </div>
+    <p id="msg" class="text-sm text-muted min-h-[1.25rem]" role="status" aria-live="polite"></p>
+    <div id="grid" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"></div>
+  </section>
+</main>
+
+<div id="modal-root" data-section="dialogs"></div>
+<div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-6 z-50 px-4 py-2 rounded-theme bg-ink text-surface text-sm opacity-0 pointer-events-none transition-opacity" role="status" aria-live="polite"></div>
+
+<script>
+(()=>{'use strict';
+const $=(s,r=document)=>r.querySelector(s),FB=window.LatticeFB;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let tt;const toast=m=>{const t=$('#toast');t.textContent=m;t.style.opacity=1;clearTimeout(tt);tt=setTimeout(()=>t.style.opacity=0,3200)};
+const BTN='px-3 py-1.5 rounded-theme border border-line hover:bg-surface2 text-sm',PRI='px-3 py-1.5 rounded-theme bg-accent text-accentInk hover:bg-accentHover text-sm font-medium';
+const S={user:null,admin:false,items:[],tab:'browse',type:'all',q:'',off:null};
+const TYPES={theme:'Theme',typography:'Font',icons:'Icons',highlighter:'Highlighter'},DATA=Object.keys(TYPES),ALL_TYPES=['theme','typography','icons','highlighter','editor','sidebar','notelist','storage','dialogs','feature'];
+const label=x=>x.kind==='script'?'Script':TYPES[x.type]||x.type;
+const parse=s=>{try{return JSON.parse(s)}catch(e){try{return window.jsyaml?jsyaml.load(s):null}catch(_){return null}}};
+const col=v=>/^(#[0-9a-f]{3,8}|(?:rgb|hsl)a?\([\d\s.,%\/-]+\)|[a-z]+)$/i.test(String(v))?v:'transparent';
+const OK_T=new Set(['path','circle','rect','line','polyline','polygon','ellipse','g']),OK_A=new Set(['d','cx','cy','r','rx','ry','x','y','x1','y1','x2','y2','width','height','points','transform','fill','stroke-width','opacity']);
+const cleanSvg=m=>{try{const doc=new DOMParser().parseFromString('<svg xmlns="http://www.w3.org/2000/svg">'+m+'</svg>','image/svg+xml');if(doc.querySelector('parsererror'))return null;
+  const walk=n=>[...n.children].forEach(c=>{if(!OK_T.has(c.localName))return c.remove();[...c.attributes].forEach(a=>{if(!OK_A.has(a.name))c.removeAttribute(a.name)});walk(c)});walk(doc.documentElement);return doc.documentElement.innerHTML}catch(e){return null}};
+const explain=e=>e&&e.code==='permission-denied'?'Firestore denied the request. Publish firestore.rules from this folder in your Firebase console.':e&&e.code==='unavailable'?'Could not reach Firebase. Check your connection.':(e&&e.message)||String(e);
+
+/* ---- modal ---- */
+function modal(html){return new Promise(res=>{const r=$('#modal-root');r.innerHTML=`<div data-ov class="fixed inset-0 z-40 grid place-items-center bg-black/40 p-4 overflow-y-auto"><div role="dialog" aria-modal="true" class="w-full max-w-lg bg-surface text-ink border border-line rounded-theme shadow-xl p-5 space-y-4">${html}</div></div>`;
+  const kd=e=>{if(e.key==='Escape')done(null)},done=v=>{document.removeEventListener('keydown',kd);r.innerHTML='';res(v)};document.addEventListener('keydown',kd);
+  r.firstChild.addEventListener('click',e=>{if('ov' in e.target.dataset||'x' in e.target.dataset)done(null);else if('ok' in e.target.dataset&&e.target.dataset.ok!=='go')done(e.target.dataset.ok||true)});
+  r._done=done;(r.querySelector('textarea,input,[data-ok]')||r).focus()})}
+const closeModal=()=>{const r=$('#modal-root');r._done&&r._done(null)};
+
+/* ---- setup ---- */
+function showSetup(back){$('#setup').hidden=false;$('#catalog').hidden=true;$('#cfg-cancel').hidden=!back;
+  const c=FB.getConfig(),src=FB.configSource();$('#setup-current').textContent=c?`Connected project: ${c.projectId} (config from ${src==='file'?'firebase-config.js':'this browser'}).`:'No Firebase config yet.';}
+function saveConfig(){const m=$('#cfg-msg');try{FB.saveConfig(FB.parseConfig($('#cfg').value));m.textContent='Saved. Connecting…';location.reload()}catch(e){m.textContent=e.message;m.style.fontWeight=600}}
+
+/* ---- rendering ---- */
+function renderAuth(){$('#auth').innerHTML=S.user?`<span class="flex items-center gap-2 text-sm">${S.user.photoURL?`<img src="${esc(S.user.photoURL)}" alt="" class="w-7 h-7 rounded-full" referrerpolicy="no-referrer">`:''}<span class="hidden sm:inline">${esc(S.user.displayName||S.user.email)}${S.admin?' · admin':''}</span><button data-act="signout" class="${BTN}">Sign out</button></span>`:`<button data-act="signin" class="${PRI}">Sign in with Google</button>`;
+  $('#tabs').innerHTML=[['browse','Browse'],...(S.user?[['mine','My plugins']]:[]),...(S.admin?[['review','Review']]:[])].map(([k,t])=>`<button role="tab" aria-selected="${S.tab===k}" data-tab="${k}" class="px-3 py-1.5 text-sm rounded-theme ${S.tab===k?'bg-accent text-accentInk':'border border-line hover:bg-surface2'}">${t}</button>`).join('')}
+function preview(x){if(x.kind==='script')return '<p class="text-xs text-muted">JavaScript plugin. Runs with full access to Lattice once installed.</p>';const d=parse(x.source)||{};
+  if(x.type==='theme'){const v=d.vars||{};return `<div class="flex h-8 rounded-theme overflow-hidden border border-line">${['surface','surface2','ink','accent','syn-keyword','syn-string'].map(k=>`<span class="flex-1" style="background:${col(v[k])}" title="${k}"></span>`).join('')}</div>`}
+  if(x.type==='typography'){const s=d.stacks||{};return `<p class="text-xs text-muted truncate">Heading: ${esc(String(s.heading||s.ui||'').split(',')[0])} · Body: ${esc(String(s.body||s.ui||'').split(',')[0])}</p>`}
+  if(x.type==='icons')return `<div class="flex gap-2 text-ink">${Object.entries(d.icons||{}).slice(0,7).map(([k,m])=>{const c=cleanSvg(String(m));return c==null?'':`<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-label="${esc(k)}">${c}</svg>`}).join('')}</div>`;
+  if(x.type==='highlighter')return `<p class="text-xs text-muted truncate">Languages: ${esc(Object.keys(d.grammars||{}).join(', '))}</p>`;return ''}
+const badge=x=>x.status==='approved'?'':`<span class="text-xs px-2 py-0.5 rounded-full border border-line">${x.status==='pending'?'Pending review':esc(x.status)}</span>`;
+function card(x,mode){const inst=FB.isInstalled(x.pluginId),upd=inst&&inst.store&&inst.store.version!==x.version,own=S.user&&x.authorUid===S.user.uid;
+  const act=mode==='review'?`<button data-act="approve" data-id="${esc(x.id)}" class="${PRI}">Approve</button><button data-act="reject" data-id="${esc(x.id)}" class="${BTN}">Reject</button>`
+    :mode==='mine'?`<button data-act="edit" data-id="${esc(x.id)}" class="${BTN}">Update</button><button data-act="delete" data-id="${esc(x.id)}" class="${BTN}">Delete</button>`
+    :inst?`${upd?`<button data-act="install" data-id="${esc(x.id)}" class="${PRI}">Update to v${esc(x.version)}</button>`:'<span class="text-sm text-muted px-2 py-1.5">Installed</span>'}<button data-act="uninstall" data-pid="${esc(x.pluginId)}" class="${BTN}">Remove</button>`
+    :`<button data-act="install" data-id="${esc(x.id)}" class="${PRI}">Install</button>`;
+  return `<article class="border border-line rounded-theme bg-surface2 p-4 flex flex-col gap-3"><div class="flex items-start justify-between gap-2"><div class="min-w-0"><h3 class="font-semibold truncate">${esc(x.name)}</h3><p class="text-xs text-muted">v${esc(x.version)} · ${esc(x.authorName||'Unknown')}${own?' (you)':''}</p></div><span class="text-xs px-2 py-0.5 rounded-full bg-surface border border-line shrink-0">${esc(label(x))}</span></div>
+  <p class="text-sm text-muted line-clamp-3">${esc(x.description||'No description.')}</p>${preview(x)}<div class="flex flex-wrap items-center gap-2 mt-auto pt-1">${act}<button data-act="source" data-id="${esc(x.id)}" class="${BTN}">Source</button>${badge(x)}</div></article>`}
+function renderGrid(){renderAuth();const q=S.q.toLowerCase();
+  $('#chips').innerHTML=[['all','All'],['theme','Themes'],['typography','Fonts'],['icons','Icons'],['highlighter','Highlighters'],['script','Scripts']].map(([k,t])=>`<button data-type="${k}" aria-pressed="${S.type===k}" class="px-3 py-1 text-sm rounded-full ${S.type===k?'bg-accent text-accentInk':'border border-line hover:bg-surface2'}">${t}</button>`).join('');
+  $('#filters').hidden=S.tab==='review';
+  let list=S.items.filter(x=>S.tab==='mine'?S.user&&x.authorUid===S.user.uid:S.tab==='review'?x.status==='pending':x.status==='approved');
+  list=list.filter(x=>S.type==='all'||(S.type==='script'?x.kind==='script':x.kind!=='script'&&x.type===S.type)).filter(x=>!q||(x.name+' '+x.description+' '+x.authorName+' '+x.pluginId).toLowerCase().includes(q));
+  $('#grid').innerHTML=list.map(x=>card(x,S.tab)).join('')||`<p class="text-sm text-muted col-span-full py-10 text-center">${S.tab==='review'?'Nothing is waiting for review.':S.tab==='mine'?'You have not published anything yet.':'No plugins here yet. Be the first to publish one.'}</p>`}
+const msg=t=>{$('#msg').textContent=t};
+
+/* ---- actions ---- */
+const find=id=>S.items.find(x=>x.id===id);
+async function viewSource(x){await modal(`<h2 class="text-lg font-semibold">${esc(x.name)} <span class="text-muted text-sm font-normal">v${esc(x.version)}</span></h2><pre class="text-xs bg-surface2 border border-line rounded-theme p-3 max-h-80 overflow-auto whitespace-pre-wrap break-all">${esc(x.source)}</pre><div class="flex justify-end"><button data-x class="${BTN}">Close</button></div>`)}
+async function install(x){
+  if(x.kind==='script'){const ok=await modal(`<h2 class="text-lg font-semibold">Install JavaScript plugin?</h2><p class="text-sm text-muted">Scripts run with full access to Lattice, including your notes. This one was reviewed by an admin, but read it first and only install code you trust.</p><pre class="text-xs bg-surface2 border border-line rounded-theme p-3 max-h-64 overflow-auto whitespace-pre-wrap break-all">${esc(x.source)}</pre><div class="flex justify-end gap-2"><button data-x class="${BTN}">Cancel</button><button data-ok class="${PRI}">Install and run</button></div>`);if(!ok)return}
+  try{await FB.install(x);toast(`${x.name} installed. Open Lattice to use it.`);renderGrid()}catch(e){toast(e.message)}}
+function analyze(text){const d=parse(text);if(d&&typeof d==='object'&&!Array.isArray(d)&&DATA.includes(d.type))return{kind:'data',meta:{pluginId:d.id,name:d.name,version:d.version||'1.0.0',type:d.type,description:d.description||''}};return{kind:'script',meta:null}}
+function validateData(d){if(d.type==='theme'){const v=d.vars||{};['surface','surface2','ink','muted','accent','accent-hover','accent-ink','line'].forEach(k=>{if(!v[k])throw Error('Theme vars is missing "'+k+'".')})}
+  else if(d.type==='typography'){if(!d.stacks||!Object.keys(d.stacks).length)throw Error('Fonts need a "stacks" object.')}
+  else if(d.type==='icons'){const e=Object.entries(d.icons||{});if(!e.length)throw Error('Icons need an "icons" object.');e.forEach(([k,m])=>{if(cleanSvg(String(m))==null)throw Error('Icon "'+k+'" is not valid SVG.')})}
+  else if(d.type==='highlighter'){const g=d.grammars;if(!g||!Object.keys(g).length)throw Error('Highlighters need "grammars".');for(const l in g){if(!Array.isArray(g[l]))throw Error('Grammar "'+l+'" must be a list.');g[l].forEach(r=>{const x=Array.isArray(r)?r[1]:r&&r.pattern;if(typeof x!=='string'||x.length>300)throw Error('Patterns must be strings under 300 characters.');new RegExp(x)})}}}
+async function openPublish(edit){if(!S.user)return toast('Sign in to publish.');
+  const f=(id,l,v='',ro)=>`<label class="block text-sm"><span class="text-muted">${l}</span><input id="${id}" value="${esc(v)}" ${ro?'readonly':''} class="mt-1 w-full px-3 py-2 rounded-theme bg-surface2 border border-line"></label>`;
+  const p=modal(`<h2 class="text-lg font-semibold">${edit?'Update plugin':'Publish a plugin'}</h2><p class="text-sm text-muted">Themes, fonts, icon sets and highlighters (JSON or YAML) go live immediately. Scripts (.js) are reviewed by an admin first.</p>
+  <textarea id="pub-src" rows="7" spellcheck="false" aria-label="Plugin source" class="w-full p-3 rounded-theme bg-surface2 border border-line text-xs">${esc(edit?edit.source:'')}</textarea>
+  <label class="inline-block ${BTN} cursor-pointer">Upload file<input id="pub-file" type="file" accept=".js,.json,.yaml,.yml" class="sr-only"></label>
+  <div class="grid grid-cols-2 gap-3">${f('m-id','Plugin id (e.g. theme.ocean)',edit?edit.pluginId:'',!!edit)}${f('m-name','Name',edit?edit.name:'')}${f('m-ver','Version (1.0.0)',edit?edit.version:'1.0.0')}
+  <label class="block text-sm"><span class="text-muted">Type</span><select id="m-type" class="mt-1 w-full px-3 py-2 rounded-theme bg-surface2 border border-line">${ALL_TYPES.map(t=>`<option ${edit&&edit.type===t?'selected':''}>${t}</option>`).join('')}</select></label></div>${f('m-desc','Description',edit?edit.description:'')}
+  <p id="pub-msg" class="text-sm min-h-[1.25rem]" role="status" aria-live="polite"></p><div class="flex justify-end gap-2"><button data-x class="${BTN}">Cancel</button><button data-ok="go" class="${PRI}">${edit?'Update':'Publish'}</button></div>`);
+  const fill=()=>{const a=analyze($('#pub-src').value);if(a.kind==='data'&&a.meta){const m=a.meta;if(!edit)$('#m-id').value=m.pluginId||'';$('#m-name').value=m.name||'';$('#m-ver').value=m.version;$('#m-type').value=m.type;$('#m-desc').value=m.description}};
+  $('#pub-src').addEventListener('input',fill);
+  $('#pub-file').addEventListener('change',e=>{const fl=e.target.files[0];if(!fl)return;const r=new FileReader();r.onload=()=>{$('#pub-src').value=r.result;fill()};r.readAsText(fl)});
+  const go=async e=>{if(e.target.dataset.ok!=='go')return;const m=$('#pub-msg');m.style.fontWeight=600;
+    try{const source=$('#pub-src').value.trim(),a=analyze(source),meta={pluginId:$('#m-id').value.trim(),name:$('#m-name').value.trim(),version:$('#m-ver').value.trim(),type:$('#m-type').value,description:$('#m-desc').value.trim()};
+      if(!source)throw Error('Paste or upload a plugin first.');if(source.length>200000)throw Error('Plugins are limited to 200,000 characters.');
+      if(!/^[a-z][a-z0-9._-]{2,59}$/.test(meta.pluginId))throw Error('Id must be 3-60 characters: lowercase letters, numbers, dots or dashes.');
+      if(!meta.name)throw Error('Add a name.');if(!/^\d+\.\d+\.\d+$/.test(meta.version))throw Error('Version must look like 1.0.0.');
+      if(a.kind==='data'){const d=parse(source);if(d.id&&d.id!==meta.pluginId)throw Error('The id inside the file ('+d.id+') must match the id above.');validateData(d)}
+      else if(DATA.includes(meta.type))throw Error('Themes, fonts, icons and highlighters must be JSON or YAML data, not scripts.');
+      m.textContent='Publishing…';const st=await FB.publish({...meta,kind:a.kind,source},S.user);closeModal();toast(st==='pending'?'Submitted for review. It will appear once an admin approves it.':'Published.')}
+    catch(err){m.textContent=explain(err)}};
+  $('#modal-root').addEventListener('click',go);await p;$('#modal-root').removeEventListener('click',go)}
+
+document.addEventListener('click',async e=>{
+  const t=e.target.closest('[data-act],[data-tab],[data-type]');if(!t)return;const d=t.dataset;
+  if(d.tab){S.tab=d.tab;renderGrid();return}if(d.type){S.type=d.type;renderGrid();return}
+  try{switch(d.act){
+    case'save-config':saveConfig();break;
+    case'clear-config':FB.clearConfig();location.reload();break;
+    case'close-setup':$('#setup').hidden=true;$('#catalog').hidden=false;break;
+    case'firebase':showSetup(!!FB.getConfig());break;
+    case'signin':await FB.signIn();break;
+    case'signout':await FB.signOut();S.tab='browse';break;
+    case'publish':await openPublish();break;
+    case'edit':await openPublish(find(d.id));break;
+    case'source':await viewSource(find(d.id));break;
+    case'install':await install(find(d.id));break;
+    case'uninstall':FB.uninstall(d.pid);toast('Removed. Lattice will ask you to reload if it is open.');renderGrid();break;
+    case'approve':await FB.setStatus(d.id,'approved');toast('Approved.');break;
+    case'reject':if(confirm('Reject and delete this submission?'))await FB.remove(d.id);break;
+    case'delete':if(confirm('Delete this plugin from the store?'))await FB.remove(d.id);break}}
+  catch(err){if(!(err&&err.code==='auth/popup-closed-by-user'))toast(explain(err))}});
+$('#q').addEventListener('input',e=>{S.q=e.target.value;renderGrid()});
+addEventListener('storage',e=>{if(e.key==='ws.installed.v1'&&!$('#catalog').hidden)renderGrid()});
+
+/* ---- boot ---- */
+(async()=>{
+  if(!FB.getConfig()){showSetup(false);return}
+  $('#catalog').hidden=false;renderAuth();msg('Connecting to Firebase…');
+  try{await FB.init()}catch(e){msg(explain(e));return}
+  FB.onAuth(async u=>{S.user=u;S.admin=await FB.isAdmin(u);if(!u&&S.tab!=='browse')S.tab='browse';renderAuth();
+    S.off&&S.off();S.off=FB.watch(u,S.admin,items=>{S.items=items;msg('');renderGrid()},e=>msg(explain(e)));renderGrid()});
+})();
+})();
+</script>
+</body>
+</html>
