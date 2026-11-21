@@ -14,7 +14,94 @@
 tailwind.config={theme:{extend:{colors:{surface:'var(--surface)',surface2:'var(--surface2)',ink:'var(--ink)',muted:'var(--muted)',accent:'var(--accent)',accentHover:'var(--accent-hover)',accentInk:'var(--accent-ink)',line:'var(--line)'},borderRadius:{theme:'var(--radius)'}}}};
 </script>
 <script src="firebase-config.js"></script>
-<script src="lattice-firebase.js"></script>
+<script>
+/* Lattice Firebase layer: config, Google sign-in, live plugin catalog, install bridge.
+   Loaded by store.html. Needs the page to be served over https:// or http://localhost. */
+(() => {
+'use strict';
+const SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
+const CFG_KEY = 'lattice.firebase.config', INST = 'ws.installed.v1';
+const REQUIRED = ['apiKey', 'authDomain', 'projectId', 'appId'];
+const lsGet = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch (e) { return d; } };
+const L = window.LatticeFB = {};
+
+/* ---- Config: accepts the object exactly as the Firebase console shows it, or JSON ---- */
+L.parseConfig = text => {
+  let t = String(text || '').trim();
+  const a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a < 0 || b < a) throw new Error('Paste the config object, starting with { and ending with }.');
+  t = t.slice(a, b + 1).replace(/^\s*\/\/.*$/gm, '')
+    .replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g, '$1"$2":')
+    .replace(/'([^'\\]*)'/g, '"$1"').replace(/,\s*}/g, '}');
+  let o; try { o = JSON.parse(t); } catch (e) { throw new Error('Could not read that object: ' + e.message); }
+  const miss = REQUIRED.filter(k => typeof o[k] !== 'string' || !o[k] || /^YOUR_|^<|^\.\.\./i.test(o[k]));
+  if (miss.length) throw new Error('Missing or placeholder values for: ' + miss.join(', ') + '.');
+  return o;
+};
+L.getConfig = () => window.LATTICE_FIREBASE_CONFIG || lsGet(CFG_KEY, null);
+L.configSource = () => window.LATTICE_FIREBASE_CONFIG ? 'file' : lsGet(CFG_KEY, null) ? 'browser' : null;
+L.saveConfig = o => localStorage.setItem(CFG_KEY, JSON.stringify(o));
+L.clearConfig = () => localStorage.removeItem(CFG_KEY);
+
+/* ---- SDK + init ---- */
+const load = src => new Promise((res, rej) => {
+  if (document.querySelector(`script[src="${src}"]`)) return res();
+  const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Could not load ' + src + '. Are you online?'));
+  document.head.appendChild(s);
+});
+L.init = async () => {
+  if (L.db) return;
+  const cfg = L.getConfig(); if (!cfg) throw new Error('Firebase is not configured.');
+  await load(SDK + 'firebase-app-compat.js');
+  await Promise.all([load(SDK + 'firebase-auth-compat.js'), load(SDK + 'firebase-firestore-compat.js')]);
+  const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(cfg);
+  L.auth = firebase.auth(app); L.db = firebase.firestore(app);
+};
+
+/* ---- Auth ---- */
+L.onAuth = cb => L.auth.onAuthStateChanged(cb);
+L.signIn = () => L.auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+L.signOut = () => L.auth.signOut();
+L.isAdmin = async u => { if (!u) return false; try { return (await L.db.collection('admins').doc(u.uid).get()).exists; } catch (e) { return false; } };
+
+/* ---- Live catalog: approved plugins, your own, and (admins only) the review queue ---- */
+L.watch = (user, admin, cb, err) => {
+  const col = L.db.collection('plugins'), parts = {}, offs = [];
+  const emit = () => { const all = new Map(); Object.values(parts).forEach(a => a.forEach(x => all.set(x.id, x)));
+    cb([...all.values()].sort((a, b) => ((b.updatedAt && b.updatedAt.seconds) || 9e9) - ((a.updatedAt && a.updatedAt.seconds) || 9e9))); };
+  const sub = (tag, q) => offs.push(q.onSnapshot(s => { parts[tag] = s.docs.map(d => ({ id: d.id, ...d.data() })); emit(); }, e => err && err(e)));
+  sub('approved', col.where('status', '==', 'approved'));
+  if (user) sub('mine', col.where('authorUid', '==', user.uid));
+  if (admin) sub('pending', col.where('status', '==', 'pending'));
+  return () => offs.forEach(f => f());
+};
+
+const sha = async s => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map(b => b.toString(16).padStart(2, '0')).join('');
+L.publish = async (p, user) => {
+  const ref = L.db.collection('plugins').doc(p.pluginId); let exists = false;
+  try { exists = (await ref.get()).exists; } catch (e) { throw new Error('That plugin id already belongs to someone else.'); }
+  const data = { pluginId: p.pluginId, name: p.name, version: p.version, type: p.type, kind: p.kind, description: p.description || '', source: p.source,
+    checksum: await sha(p.source), status: p.kind === 'script' ? 'pending' : 'approved', authorUid: user.uid, authorName: user.displayName || 'Anonymous',
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+  if (!exists) { data.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await ref.set(data); } else await ref.update(data);
+  return data.status;
+};
+L.remove = id => L.db.collection('plugins').doc(id).delete();
+L.setStatus = (id, status) => L.db.collection('plugins').doc(id).update({ status });
+
+/* ---- Install bridge: writes to the same list Lattice reads at startup and on storage events ---- */
+L.installed = () => lsGet(INST, []);
+L.isInstalled = pluginId => L.installed().find(e => e.ids.includes(pluginId)) || null;
+L.install = async x => {
+  if (x.checksum && await sha(x.source) !== x.checksum) throw new Error('Checksum mismatch: the stored source does not match its fingerprint.');
+  const list = L.installed().filter(e => !e.ids.includes(x.pluginId));
+  list.push({ kind: x.kind === 'script' ? 'js' : 'data', src: x.source, ids: [x.pluginId], store: { version: x.version, name: x.name } });
+  localStorage.setItem(INST, JSON.stringify(list));
+};
+L.uninstall = pluginId => localStorage.setItem(INST, JSON.stringify(L.installed().filter(e => !e.ids.includes(pluginId))));
+})();
+
+</script>
 <style>
 :root{--surface:#FAFAF9;--surface2:#F3F3F1;--ink:#1C1C1A;--muted:#66665F;--accent:#4457D6;--accent-hover:#3345B8;--accent-ink:#fff;--line:rgba(28,28,26,.12);--radius:.625rem;color-scheme:light}
 @media(prefers-color-scheme:dark){:root{--surface:#151517;--surface2:#1E1E21;--ink:#ECECEA;--muted:#9A9AA0;--accent:#8FA0FF;--accent-hover:#AAB7FF;--accent-ink:#11131F;--line:rgba(255,255,255,.1);color-scheme:dark}}
@@ -25,6 +112,12 @@ pre,code,textarea{font-family:'JetBrains Mono',ui-monospace,monospace}
 </style>
 </head>
 <body>
+<div id="fatal" hidden role="alert" style="position:sticky;top:0;z-index:60;padding:.75rem 1rem;background:#B42318;color:#fff;font:500 14px system-ui,sans-serif"></div>
+<script>
+window.showFatal=function(m){var f=document.getElementById("fatal");if(f){f.hidden=false;f.textContent="Something went wrong: "+m}};
+addEventListener("error",function(e){showFatal(e.message)});
+addEventListener("unhandledrejection",function(e){showFatal((e.reason&&e.reason.message)||e.reason)});
+</script>
 <header id="navbar" data-section="navbar" class="sticky top-0 z-20 bg-surface/90 backdrop-blur border-b border-line">
   <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-3">
     <a href="#" class="text-xl font-semibold tracking-tight">Lattice <span class="text-muted font-normal">Store</span></a>
@@ -37,10 +130,11 @@ pre,code,textarea{font-family:'JetBrains Mono',ui-monospace,monospace}
 </header>
 
 <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-  <section id="setup" data-section="setup" hidden class="max-w-2xl mx-auto py-8 space-y-4">
+  <section id="setup" data-section="setup" class="max-w-2xl mx-auto py-8 space-y-4">
     <h1 class="text-3xl font-semibold tracking-tight">Connect Firebase</h1>
     <p class="text-muted">The store keeps plugins in your own Firebase project. Paste the web app config object from <b>Project settings → Your apps</b>, exactly as the console shows it. Nothing is sent anywhere except to your Firebase project.</p>
     <div id="setup-current" class="text-sm text-muted"></div>
+    <p id="env-note" class="text-sm"></p>
     <textarea id="cfg" rows="10" spellcheck="false" aria-label="Firebase config object" class="w-full p-3 rounded-theme bg-surface2 border border-line text-xs" placeholder='const firebaseConfig = {
   apiKey: "...",
   authDomain: "your-project.firebaseapp.com",
@@ -77,6 +171,7 @@ pre,code,textarea{font-family:'JetBrains Mono',ui-monospace,monospace}
 <script>
 (()=>{'use strict';
 const $=(s,r=document)=>r.querySelector(s),FB=window.LatticeFB;
+if(!FB)window.showFatal('The Firebase layer did not load.');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let tt;const toast=m=>{const t=$('#toast');t.textContent=m;t.style.opacity=1;clearTimeout(tt);tt=setTimeout(()=>t.style.opacity=0,3200)};
 const BTN='px-3 py-1.5 rounded-theme border border-line hover:bg-surface2 text-sm',PRI='px-3 py-1.5 rounded-theme bg-accent text-accentInk hover:bg-accentHover text-sm font-medium';
@@ -183,8 +278,11 @@ addEventListener('storage',e=>{if(e.key==='ws.installed.v1'&&!$('#catalog').hidd
 
 /* ---- boot ---- */
 (async()=>{
-  if(!FB.getConfig()){showSetup(false);return}
-  $('#catalog').hidden=false;renderAuth();msg('Connecting to Firebase…');
+  const env=$('#env-note');
+  if(location.protocol==='file:')env.textContent='You opened this as a local file. Google sign-in needs the folder served from http://localhost or https. See the README.';
+  else if(/claude\.ai|claudeusercontent\.com/.test(location.hostname))env.textContent='This page is hosted somewhere that blocks Firebase and Google sign-in. Host the folder on your own https address or localhost.';
+  if(!FB||!FB.getConfig()){showSetup(false);return}
+  $('#setup').hidden=true;$('#catalog').hidden=false;renderAuth();msg('Connecting to Firebase…');
   try{await FB.init()}catch(e){msg(explain(e));return}
   FB.onAuth(async u=>{S.user=u;S.admin=await FB.isAdmin(u);if(!u&&S.tab!=='browse')S.tab='browse';renderAuth();
     S.off&&S.off();S.off=FB.watch(u,S.admin,items=>{S.items=items;msg('');renderGrid()},e=>msg(explain(e)));renderGrid()});
